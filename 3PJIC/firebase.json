@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "target": "main",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "firebase-debug.log",
+      "README.md",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(html|css|js)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

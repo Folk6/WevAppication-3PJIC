@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="15" fill="#1f7a52"/>
+  <!-- หัวใจที่เป็นกล่องข้อความ: Physical health + Post + Care -->
+  <path d="M32 50 C27 46 13 38 13 26 C13 19.5 18 15 23.5 15 C27.3 15 30.3 17 32 20 C33.7 17 36.7 15 40.5 15 C46 15 51 19.5 51 26 C51 38 37 46 32 50 Z" fill="#ffffff"/>
+  <path d="M18 38 L13 52 L28 45 Z" fill="#ffffff"/>
+  <!-- รอยยิ้ม: Joy -->
+  <path d="M24 29 Q32 37 40 29" fill="none" stroke="#1f7a52" stroke-width="3.6" stroke-linecap="round"/>
+  <!-- ประกาย: Item / Interest -->
+  <path d="M50 6 L52 11.5 L57.5 13.5 L52 15.5 L50 21 L48 15.5 L42.5 13.5 L48 11.5 Z" fill="#f6c94a"/>
+</svg>

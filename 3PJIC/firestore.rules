@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// =====================================================================
+// กฎความปลอดภัยของ KaiDee
+// - ผู้ใช้อ่าน/เขียนได้เฉพาะข้อมูลของตัวเอง (users/{uid} ที่ uid ตรงกับบัญชีที่ล็อกอิน)
+// - ข้อมูลย่อย เช่น ประวัติน้ำหนัก users/{uid}/weights ใช้กฎเดียวกัน
+// - นอกนั้นปฏิเสธทั้งหมด
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read, create, update, delete: if request.auth != null && request.auth.uid == uid;
+
+      match /{subcollection}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ฐานข้อมูลเมนูอาหาร (จะเพิ่มในขั้นถัดไป): ทุกคนที่ล็อกอินอ่านได้ แต่แก้ไขจากเว็บไม่ได้
+    match /foods/{foodId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

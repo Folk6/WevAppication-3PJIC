@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ออกกำลังกายวันนี้ | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <nav aria-label="ตำแหน่งหน้า" style="font-size:14px;color:var(--muted)"><a href="exercise.html">โปรแกรมของฉัน</a> / <span id="crumb"></span></nav>
+      <div class="page-head"><div><small id="sub"></small><h1 id="title"></h1></div></div>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <!-- ระหว่างออกกำลังกาย -->
+      <div class="cols" id="doing" hidden>
+        <div class="col-main" id="moves"></div>
+        <aside class="col-side">
+          <section class="card" id="sumCard">
+            <div class="section-head"><h2 style="font-size:17px">ความคืบหน้าวันนี้</h2><span id="progText"></span></div>
+            <div class="gh-bar goal-mini" style="background:var(--pandan-soft);height:8px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="ความคืบหน้าวันนี้" id="progBar"><i style="background:var(--pandan)"></i></div>
+            <span style="font-size:14px;color:var(--muted)" id="restText"></span>
+          </section>
+          <p class="alert alert-success" style="margin:0" id="tip"></p>
+          <div class="rest-bar" id="restBar" role="status" hidden><span><small>พักก่อนเซตถัดไป</small><span class="n" id="restN"></span></span><button type="button" id="restSkip">ข้ามการพัก</button></div>
+          <p class="field-error" id="finErr"></p>
+          <button class="btn btn-primary" type="button" id="finish">เสร็จแล้ว บันทึก</button>
+          <p class="fine" style="margin:0;font-size:13px;color:var(--muted);text-align:center">ถ้าเจ็บหน้าอก หน้ามืด หรือปวดข้อผิดปกติ ให้หยุดทันที</p>
+        </aside>
+      </div>
+
+      <!-- หลังฝึกเสร็จ -->
+      <div id="after" hidden style="max-width:560px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+        <section class="done-hero" aria-live="polite">
+          <span class="ck" aria-hidden="true">✓</span>
+          <h2 id="doneTitle">ฝึกเสร็จแล้ว เก่งมาก!</h2>
+          <span id="doneSub" style="font-size:14px;color:#e7f4ec"></span>
+          <div class="nums"><span><b id="nDays"></b>วันสัปดาห์นี้</span><span><b id="nMin"></b>นาทีสัปดาห์นี้</span><span><b id="nLevel"></b>ระดับโปรแกรม</span></div>
+        </section>
+        <section class="card">
+          <h2 style="font-size:18px" id="foodTitle">เติมโปรตีนหลังฝึก</h2>
+          <p style="margin:0;color:#3c4a43;font-size:15px" id="foodText"></p>
+          <div id="foods"></div>
+          <span style="font-size:12px;color:var(--muted)">ค่าโปรตีนต่อ 100 กรัม จาก Thai FCD มหาวิทยาลัยมหิดล · ตัดเมนูที่คุณแพ้และไม่เหมาะกับโรคประจำตัวออกแล้ว</span>
+        </section>
+        <p class="alert" style="margin:0;background:#e1edf3;color:#1d4a5f" id="nextNote"></p>
+        <div class="btn-row" style="grid-template-columns:1fr 1fr"><a class="btn btn-outline" href="exercise.html">ดูโปรแกรมสัปดาห์นี้</a><a class="btn btn-primary" href="app.html">กลับหน้าหลัก</a></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { pageTour, PAGE_STEPS } from "./js/tour.js";
+import { markTourSeen } from "./js/firebase.js";
+import { thaiError, showAlert, setBusy } from "./js/firebase.js";
+import { guard, el } from "./js/shell.js";
+import { DAY_FULL, KIND, dayIndex, exerciseBlocked, weekSummary } from "./js/exercise.js";
+import { loadLogs, saveLog, ensureSettings, thisWeek, figure, openMoveSheet } from "./js/exercise-ui.js";
+import { FOODS, fitFor } from "./js/foods.js";
+import { thumb } from "./js/food-ui.js";
+
+const $ = (id) => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const today = dayIndex();
+const di = /^[0-6]$/.test(qs.get("d") || "") ? Number(qs.get("d")) : today;
+const short = qs.has("short");
+let user, profile, prog, day, logs = {}, ticks = [], restTimer = null, cardio = { on: false, start: 0, acc: 0, t: null };
+
+guard({ active: "track", needProfile: true }, async (u, state) => {
+  pageTour("workout", PAGE_STEPS.workout, { data: state.data, save: (key) => markTourSeen(u.uid, key) });
+  user = u; profile = state.data.profile;
+  if (exerciseBlocked(profile)) return location.replace("exercise.html");
+  let settings = state.data.exercise || {};
+  try { settings = await ensureSettings(u.uid, state.data); logs = await loadLogs(u.uid); }
+  catch (e) { showAlert($("formAlert"), thaiError(e)); }
+  prog = thisWeek(profile, settings);
+  day = prog.days[di];
+  if (day.kind === "rest" && !day.stretch) return location.replace("exercise.html?d=" + di);
+  if (day.kind === "rest") day = Object.assign({}, day, { minutes: 10, title: "ยืดคลายกล้ามเนื้อ" });
+  if (short) shorten();
+  $("crumb").textContent = di === today ? "วันนี้" : DAY_FULL[di];
+  $("title").textContent = short ? "แบบสั้น 10 นาที" : day.title;
+  $("sub").textContent = DAY_FULL[di] + " · " + (day.stretch ? "วันพัก" : KIND[day.kind].label) + " · ประมาณ " + day.minutes + " นาที";
+  $("doing").hidden = false;
+  renderMoves();
+  const done = logs[prog.dates[di]];
+  if (di > today) { $("finish").hidden = true; $("finErr").textContent = "ยังไม่ถึงวันนี้ ดูท่าล่วงหน้าได้ กดบันทึกได้ในวันนั้น"; }
+  else if (done && done.status !== "skipped") { $("finish").textContent = "ทำแล้ว ✓ (บันทึกซ้ำได้)"; }
+});
+
+// ทำแบบสั้น: 3 ท่าแรก ท่าละ 1 เซต หรือคาร์ดิโอ 10 นาที
+function shorten() {
+  day = Object.assign({}, day, { minutes: 10, cardioMin: day.moves.length ? 0 : 10 });
+  day.moves = day.moves.slice(0, 3).map((m) => Object.assign({}, m, { sets: 1, dose: "1 เซต × " + m.reps }));
+  if (!day.moves.length) day.kind = "cardio";
+}
+
+// การ์ดรายการท่าแบบง่าย (อบอุ่น / ยืดเหยียด / คาร์ดิโอในบ้าน): ไม่มีปุ่มเซต
+function listCard(title, sub, items, label) {
+  const c = el("section", "card");
+  c.append(el("h2", null, title));
+  c.firstChild.style.fontSize = "17px";
+  if (sub) { const p = el("p", null, sub); p.style.cssText = "margin:0;font-size:14px;color:var(--muted)"; c.append(p); }
+  const ul = el("ul", "mini-list");
+  items.forEach((m) => {
+    const li = el("li");
+    const pic = el("span", "pic"); pic.append(figure(m.fig, 36));
+    const t = el("span", "txt"); t.append(el("strong", null, m.name), el("small", null, m.dose));
+    const how = el("button", "how-sm", "วิธีทำ"); how.type = "button"; how.setAttribute("aria-label", "ดูวิธีทำท่า " + m.name);
+    how.onclick = () => openMoveSheet(m, label + " · " + m.dose);
+    li.append(pic, t, how); ul.append(li);
+  });
+  c.append(ul);
+  return c;
+}
+
+function renderMoves() {
+  const box = $("moves");
+  box.replaceChildren();
+  if (day.stretch) {
+    box.append(listCard("ยืดคลายกล้ามเนื้อ 6 ท่า", "สำหรับคนนั่งนาน ทำช้า ๆ หายใจลึก ไม่ต้องยืดจนเจ็บ", day.stretch, "ยืดคลาย"));
+  } else if (day.warmup && !short) {
+    box.append(listCard("อบอุ่นร่างกาย 3 นาที", "ทำก่อนเริ่มทุกครั้ง ช่วยลดการบาดเจ็บ", day.warmup, "อบอุ่นร่างกาย"));
+  }
+  ticks = day.moves.map((m) => Array(m.sets).fill(false));
+  day.moves.forEach((m, i) => {
+    const c = el("section", "card move");
+    const top = el("div", "move-top");
+    const pic = el("span", "pic"); pic.append(figure(m.fig, 52));
+    const txt = el("span", "txt"); txt.append(el("strong", null, (i + 1) + ". " + m.name), el("b", null, m.dose));
+    const how = el("button", "how"); how.type = "button"; how.setAttribute("aria-label", "ดูวิธีทำท่า " + m.name);
+    how.append(el("span", null, "?"), el("span", null, "วิธีทำ"));
+    how.firstChild.style.cssText = "font-weight:700;font-size:16px;color:var(--pandan)";
+    how.onclick = () => openMoveSheet(m, "ท่าที่ " + (i + 1) + " · " + m.dose);
+    top.append(pic, txt, how);
+    const sets = el("div", "sets"); sets.setAttribute("role", "group"); sets.setAttribute("aria-label", "เซตของท่า " + m.name);
+    for (let s = 0; s < m.sets; s++) {
+      const b = el("button", null, String(s + 1)); b.type = "button";
+      b.setAttribute("aria-pressed", "false"); b.setAttribute("aria-label", "ทำเซต " + (s + 1) + " ของ " + m.name + " แล้ว");
+      b.onclick = () => {
+        ticks[i][s] = !ticks[i][s];
+        b.setAttribute("aria-pressed", ticks[i][s]);
+        const last = i === day.moves.length - 1 && s === m.sets - 1;
+        if (ticks[i][s] && !last) startRest(m.rest); else stopRest();
+        updateProgress();
+      };
+      sets.append(b);
+    }
+    c.append(top, sets);
+    box.append(c);
+  });
+  if (day.cardioMin) box.append(cardioCard());
+  if (day.cooldown && !short && !day.stretch) box.append(listCard("ยืดเหยียดหลังเล่น 3 นาที", "ค้างแต่ละท่าไว้ หายใจลึก ๆ", day.cooldown, "ยืดเหยียด"));
+  $("tip").textContent = day.kind === "cardio" || day.kind === "mix"
+    ? "คาร์ดิโอระดับปานกลาง: หายใจเร็วขึ้น พูดเป็นประโยคได้แต่ร้องเพลงไม่ได้"
+    : "หายใจออกตอนออกแรง ไม่กลั้นหายใจ ถ้าทำครบทุกเซตง่ายเกินไป ค่อยเพิ่มจำนวนครั้ง";
+  $("restText").textContent = day.stretch ? "ทำครบแล้วกดบันทึก" : day.moves.length ? "พักระหว่างเซต " + day.moves[0].rest + " วินาที · กดเลขเซตเมื่อทำเสร็จ" : "กดเริ่มจับเวลา แล้วกดเสร็จแล้วเมื่อครบ";
+  if (day.stretch) $("tip").textContent = "ลุกขยับทุก 1 ชั่วโมงระหว่างวัน ช่วยลดปวดคอ บ่า หลัง";
+  $("sumCard").hidden = !!day.stretch;
+  updateProgress();
+}
+
+function cardioCard() {
+  const c = el("section", "card");
+  const top = el("div", "move-top");
+  const pic = el("span", "pic"); pic.append(figure("cardio", 52));
+  const txt = el("span", "txt"); txt.append(el("strong", null, "คาร์ดิโอ " + day.cardioMin + " นาที"), el("span", null, day.ideas || "เดินเร็ว ปั่นจักรยาน หรือว่ายน้ำ"));
+  txt.lastChild.style.cssText = "font-size:14px;color:var(--muted)";
+  top.append(pic, txt);
+  const t = el("div", "timer-big", "0:00"); t.id = "cTime"; t.setAttribute("role", "timer"); t.setAttribute("aria-live", "off");
+  const goal = el("span", null, "เป้าหมาย " + day.cardioMin + ":00 · เริ่มด้วยเดินช้า 5 นาที จบด้วยยืดเหยียด");
+  goal.style.cssText = "text-align:center;font-size:14px;color:var(--muted)";
+  const b = el("button", "btn btn-outline", "เริ่มจับเวลา"); b.type = "button"; b.style.cssText = "width:100%;align-self:stretch";
+  b.onclick = () => {
+    if (cardio.on) { cardio.acc += Date.now() - cardio.start; clearInterval(cardio.t); cardio.on = false; b.textContent = "เริ่มต่อ"; }
+    else { cardio.start = Date.now(); cardio.on = true; b.textContent = "หยุดชั่วคราว"; cardio.t = setInterval(tickCardio, 1000); }
+    updateProgress();
+  };
+  c.append(top, t, goal, b);
+  if (day.circuit && !short) {
+    const k = day.circuit;
+    const tg = el("button", "linkbtn", "ออกไปข้างนอกไม่ได้? ดูชุดคาร์ดิโอในบ้าน"); tg.type = "button"; tg.setAttribute("aria-expanded", "false");
+    const panel = listCard("คาร์ดิโอในบ้าน" + (k.low ? " (ไม่กระแทกข้อเข่า)" : ""),
+      "ทำท่าละ " + k.work + " วินาที พัก " + k.rest + " วินาที ครบ " + k.moves.length + " ท่าเป็น 1 รอบ · ทำ " + k.rounds + " รอบ (ประมาณ " + k.rounds * k.moves.length + " นาที) กดจับเวลาด้านบนได้เลย",
+      k.moves, "คาร์ดิโอในบ้าน");
+    panel.hidden = true; panel.classList.add("inset");
+    tg.onclick = () => { panel.hidden = !panel.hidden; tg.setAttribute("aria-expanded", String(!panel.hidden)); };
+    c.append(tg, panel);
+  }
+  return c;
+}
+function cardioSecs() { return Math.floor((cardio.acc + (cardio.on ? Date.now() - cardio.start : 0)) / 1000); }
+function tickCardio() {
+  const s = cardioSecs();
+  $("cTime").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  if (s % 30 === 0) updateProgress();
+}
+
+function updateProgress() {
+  if (day.stretch) return;
+  const total = ticks.reduce((a, t) => a + t.length, 0) + (day.cardioMin ? 1 : 0);
+  let done = ticks.reduce((a, t) => a + t.filter(Boolean).length, 0);
+  if (day.cardioMin && cardioSecs() >= day.cardioMin * 60) done++;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  $("progText").textContent = done + " / " + total + (day.cardioMin && !day.moves.length ? "" : " เซต");
+  $("progBar").setAttribute("aria-valuenow", pct);
+  $("progBar").querySelector("i").style.width = pct + "%";
+}
+
+function startRest(sec) {
+  stopRest();
+  let left = sec;
+  const show = () => { $("restN").textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); };
+  $("restBar").hidden = false; show();
+  restTimer = setInterval(() => { left--; if (left <= 0) { stopRest(); if (navigator.vibrate) navigator.vibrate(200); } else show(); }, 1000);
+}
+function stopRest() { clearInterval(restTimer); restTimer = null; $("restBar").hidden = true; }
+$("restSkip").onclick = stopRest;
+
+// ---- บันทึก ----
+$("finish").onclick = async () => {
+  const setsDone = ticks.reduce((a, t) => a + t.filter(Boolean).length, 0);
+  const cMin = Math.round(cardioSecs() / 60);
+  if (!setsDone && cMin < 1 && !day.stretch && !$("finish").dataset.sure) {
+    $("finErr").textContent = "ยังไม่ได้กดเซตหรือจับเวลาเลย ถ้าทำครบแล้วจริง กดบันทึกอีกครั้ง";
+    $("finish").dataset.sure = "1"; return;
+  }
+  stopRest(); clearInterval(cardio.t);
+  const minutes = day.cardioMin && cMin ? Math.max(cMin, day.moves.length ? day.minutes - day.cardioMin + cMin : cMin) : day.minutes;
+  setBusy($("finish"), true, "กำลังบันทึก…");
+  try {
+    await saveLog(user.uid, prog.dates[di], { day: di, kind: day.kind, title: day.title, minutes, sets: setsDone, status: short ? "short" : "done" });
+    logs[prog.dates[di]] = { status: short ? "short" : "done", minutes };
+    showAfter(setsDone, minutes);
+  } catch (e) { setBusy($("finish"), false); $("finErr").textContent = thaiError(e); }
+};
+
+function showAfter(setsDone, minutes) {
+  $("doing").hidden = true; $("after").hidden = false;
+  $("title").textContent = "บันทึกแล้ว";
+  $("doneSub").textContent = day.title + " · " + minutes + " นาที" + (setsDone ? " · " + setsDone + " เซต" : "");
+  const sum = weekSummary(prog.days, logs);
+  $("nDays").textContent = sum.done + "/" + sum.planned;
+  $("nMin").textContent = sum.minutes;
+  $("nLevel").textContent = prog.level;
+  const strength = day.moves.length > 0;
+  const pFactor = profile.goal === "muscle" || profile.goal === "gain" ? 1.6 : 1.0;
+  const pTarget = Math.round(profile.weight * pFactor);
+  $("foodTitle").textContent = strength ? "เติมโปรตีนหลังฝึก" : "มื้อถัดไปหลังคาร์ดิโอ";
+  $("foodText").textContent = (strength ? "กินมื้อที่มีโปรตีนภายใน 1–2 ชั่วโมงหลังฝึก ช่วยซ่อมและสร้างกล้ามเนื้อ " : "ดื่มน้ำให้พอ แล้วกินมื้อถัดไปตามแผน เลือกเมนูที่มีโปรตีนและไม่ทอด ") + "เป้าโปรตีนของคุณประมาณ " + pTarget + " กรัมต่อวัน กระจายให้มีทุกมื้อ";
+  const list = FOODS.filter((f) => f.n && f.n.p >= 10 && f.n.kcal && ["food", "store", "snack"].includes(f.cat) && fitFor(f, profile).ok && !f.tags.includes("fat"))
+    .sort((a, b) => b.n.p / b.n.kcal - a.n.p / a.n.kcal).slice(0, 4);
+  $("foods").replaceChildren(...list.map((f) => {
+    const a = el("a", "food-row"); a.href = "food.html?id=" + encodeURIComponent(f.id);
+    const t = el("span"); t.append(el("strong", null, f.name), el("small", null, "โปรตีน " + Math.round(f.n.p) + " ก. · " + Math.round(f.n.kcal) + " kcal (ต่อ 100 ก.)"));
+    const arrow = el("span", null, "›"); arrow.setAttribute("aria-hidden", "true"); arrow.style.cssText = "flex:none;color:#9aa8a0";
+    a.append(thumb(f), t, arrow);
+    return a;
+  }));
+  if (!list.length) $("foods").append(el("p", "empty-note", "ยังไม่มีเมนูโปรตีนสูงที่เหมาะกับข้อจำกัดของคุณ ลองดูในหน้าค้นหาเมนู"));
+  const nx = prog.days[(di + 1) % 7];
+  $("nextNote").replaceChildren(el("strong", null, (di === 6 ? "วันจันทร์หน้า" : "พรุ่งนี้") + ": " + nx.title + " "),
+    document.createTextNode(nx.kind === "rest" ? "ไม่ต้องกินเพิ่ม กินตามแผนปกติ เน้นผักและดื่มน้ำให้พอ" : nx.detail));
+  window.scrollTo({ top: 0 });
+  $("doneTitle").focus?.();
+}
+</script>
+</body>
+</html>

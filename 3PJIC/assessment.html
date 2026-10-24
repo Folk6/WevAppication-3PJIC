@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>แบบประเมิน | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="app-shell" id="page" hidden>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="app.html">3PJIC</a>
+      <div class="actions"><a class="btn btn-outline" href="app.html" id="cancelLink" hidden>ยกเลิก</a></div>
+    </div>
+  </header>
+
+  <main class="app-main" style="max-width:600px">
+    <ol class="progress" id="progress" aria-label="ขั้นตอน">
+      <li class="on">ข้อมูลร่างกาย</li><li>เป้าหมาย</li><li>สุขภาพ</li>
+    </ol>
+    <p class="alert" id="formAlert" role="alert"></p>
+
+    <form class="card" id="quiz" novalidate style="gap:24px">
+      <!-- ขั้นที่ 1 -->
+      <section class="form-step" data-step="1">
+        <h1 style="font-size:24px" id="step1Title">เริ่มจากรู้จักร่างกายคุณ</h1>
+        <p class="lead">ใช้คำนวณดัชนีมวลกายและพลังงานที่ควรได้รับต่อวัน</p>
+        <div class="field">
+          <span class="label">เพศ</span>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="sex" value="m">ชาย</label>
+            <label class="chip"><input type="radio" name="sex" value="f">หญิง</label>
+          </div>
+          <span class="field-error" id="sex-err"></span>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label for="age">อายุ</label>
+            <div class="unit"><input id="age" type="number" inputmode="numeric" min="6" max="100"><em>ปี</em></div>
+            <span class="field-error" id="age-err"></span></div>
+          <div class="field"><label for="height">ส่วนสูง</label>
+            <div class="unit"><input id="height" type="number" inputmode="decimal" min="100" max="220"><em>ซม.</em></div>
+            <span class="field-error" id="height-err"></span></div>
+          <div class="field"><label for="weight">น้ำหนัก</label>
+            <div class="unit"><input id="weight" type="number" inputmode="decimal" step="0.1" min="20" max="250"><em>กก.</em></div>
+            <span class="field-error" id="weight-err"></span></div>
+          <div class="field" id="pregField" hidden><span class="label">ตั้งครรภ์หรือให้นมบุตร</span>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="preg" value="no" checked>ไม่ใช่</label>
+              <label class="chip"><input type="radio" name="preg" value="yes">ใช่</label>
+            </div></div>
+        </div>
+        <div class="field">
+          <span class="label">ในแต่ละวันคุณขยับตัวแค่ไหน</span>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="act" value="1.2"><b>นั่งเกือบทั้งวัน</b><span>เรียน ทำงานหน้าคอม ไม่ค่อยออกกำลังกาย</span></label>
+            <label class="choice"><input type="radio" name="act" value="1.375"><b>ขยับบ้าง</b><span>ออกกำลังกาย 1–3 วันต่อสัปดาห์</span></label>
+            <label class="choice"><input type="radio" name="act" value="1.55"><b>ออกกำลังกายประจำ</b><span>3–5 วันต่อสัปดาห์</span></label>
+            <label class="choice"><input type="radio" name="act" value="1.725"><b>หนักมาก</b><span>เกือบทุกวัน หรืองานใช้แรงกาย</span></label>
+          </div>
+          <span class="field-error" id="act-err"></span>
+        </div>
+      </section>
+
+      <!-- ขั้นที่ 2 -->
+      <section class="form-step" data-step="2" hidden>
+        <h1 style="font-size:24px">คุณอยากให้การกินช่วยเรื่องอะไร</h1>
+        <p class="lead">เลือกเป้าหมายหลัก 1 ข้อ</p>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="goal" value="lose"><b>ลดน้ำหนัก</b><span>ลดพลังงานลงวันละประมาณ 500 kcal</span></label>
+          <label class="choice"><input type="radio" name="goal" value="keep"><b>คุมน้ำหนักให้คงที่</b><span>กินให้พอดีกับที่ร่างกายใช้</span></label>
+          <label class="choice"><input type="radio" name="goal" value="gain"><b>เพิ่มน้ำหนัก</b><span>เพิ่มพลังงานวันละประมาณ 300 kcal</span></label>
+          <label class="choice"><input type="radio" name="goal" value="muscle"><b>เพิ่มกล้ามเนื้อ</b><span>เน้นโปรตีน ควบคู่การออกกำลังกาย</span></label>
+          <label class="choice"><input type="radio" name="goal" value="health"><b>กินให้สุขภาพดีขึ้น</b><span>ยังไม่ได้คิดเรื่องน้ำหนัก</span></label>
+        </div>
+        <span class="field-error" id="goal-err"></span>
+      </section>
+
+      <!-- ขั้นที่ 3 -->
+      <section class="form-step" data-step="3" hidden>
+        <h1 style="font-size:24px">มีเรื่องสุขภาพที่ต้องระวังไหม</h1>
+        <p class="lead">เลือกได้หลายข้อ ถ้าไม่มีให้กดดูผลได้เลย</p>
+        <div class="field"><span class="label">โรคประจำตัว</span>
+          <div class="chips" id="condChips"></div>
+          <label for="condOther" style="font-size:14px;color:var(--muted);margin-top:6px">โรคอื่น ๆ ที่ไม่มีในรายการ (พิมพ์เอง ไม่บังคับ)</label>
+          <input id="condOther" type="text" maxlength="100" placeholder="เช่น หอบหืด, ไทรอยด์"></div>
+        <div class="field"><span class="label">แพ้อาหาร</span>
+          <div class="chips allergy-chips" id="allergyChips"></div>
+          <label for="allergyOther" style="font-size:14px;color:var(--muted);margin-top:6px">แพ้อย่างอื่น (พิมพ์เอง คั่นด้วยจุลภาค ไม่บังคับ)</label>
+          <input id="allergyOther" type="text" maxlength="100" placeholder="เช่น มะม่วง, กะทิ, งา"></div>
+        <div class="field"><label for="other">อื่น ๆ ที่อยากให้รู้ (ไม่บังคับ)</label>
+          <input id="other" type="text" maxlength="200" placeholder="เช่น ไม่กินเนื้อวัว, กินมังสวิรัติ"></div>
+      </section>
+
+      <!-- ผลลัพธ์ -->
+      <section class="form-step" data-step="4" hidden id="result" aria-live="polite"></section>
+
+      <div class="nav-row">
+        <button class="btn btn-outline" type="button" id="backBtn" hidden>ย้อนกลับ</button>
+        <button class="btn btn-primary" type="submit" id="nextBtn">ถัดไป</button>
+      </div>
+    </form>
+    <p class="fine">3PJIC ให้คำแนะนำด้านอาหารทั่วไป ไม่ใช้แทนการวินิจฉัยหรือคำแนะนำจากแพทย์ เกณฑ์ดัชนีมวลกายใช้เกณฑ์สำหรับคนเอเชีย</p>
+  </main>
+</div>
+
+<script type="module">
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { doc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { auth, db, thaiError, setBusy, showAlert, getUserState } from "./js/firebase.js";
+import { CONDITIONS, ALLERGIES, analyze, normAllergies } from "./js/nutrition.js";
+import { activeGoal, goalPlan } from "./js/goal.js";
+
+const $ = (id) => document.getElementById(id);
+const form = $("quiz");
+let step = 1, user = null, oldProfile = null, result = null, profile = null, oldGoal = null;
+
+// สร้างตัวเลือกโรคและอาหารที่แพ้จากข้อมูลใน nutrition.js (แก้ที่เดียว ใช้ได้ทุกหน้า)
+function chip(name, value, label) {
+  const l = document.createElement("label"); l.className = "chip";
+  const i = document.createElement("input"); i.type = "checkbox"; i.name = name; i.value = value;
+  l.append(i, label); return l;
+}
+Object.entries(CONDITIONS).forEach(([k, c]) => $("condChips").append(chip("cond", k, c.label)));
+ALLERGIES.forEach((a) => {
+  const c = chip("allergy", a.key, a.key);
+  const h = document.createElement("small"); h.textContent = a.hint; c.append(h);
+  $("allergyChips").append(c);
+});
+
+// ===== เข้าหน้านี้ได้เมื่อล็อกอินและยินยอมแล้ว ถ้ามีข้อมูลเดิมจะเติมไว้ให้แก้ =====
+onAuthStateChanged(auth, async (u) => {
+  if (!u) return window.location.replace("login.html");
+  user = u;
+  try {
+    const state = await getUserState(u.uid);
+    if (!state.consented) return window.location.replace("consent.html");
+    if (state.data.profile) { oldProfile = state.data.profile; fill(oldProfile); }
+    oldGoal = activeGoal(state.data);
+  } catch (err) { showAlert($("formAlert"), thaiError(err)); }
+  $("loading").hidden = true;
+  $("page").hidden = false;
+});
+
+function fill(p) {
+  $("step1Title").textContent = "แก้ไขข้อมูลสุขภาพ";
+  $("cancelLink").hidden = false;
+  const check = (name, v) => { const el = form.querySelector(`input[name=${name}][value="${v}"]`); if (el) el.checked = true; };
+  check("sex", p.sex); check("act", p.activity); check("goal", p.goal); check("preg", p.pregnant ? "yes" : "no");
+  $("age").value = p.age; $("height").value = p.height; $("weight").value = p.weight; $("other").value = p.other || ""; $("condOther").value = p.conditionOther || ""; $("allergyOther").value = p.allergyOther || "";
+  (p.conditions || []).forEach((c) => check("cond", c));
+  normAllergies(p.allergies).forEach((a) => check("allergy", a));
+  syncPreg();
+}
+
+// ช่องตั้งครรภ์แสดงเฉพาะเพศหญิง
+function syncPreg() {
+  const female = form.querySelector("input[name=sex]:checked")?.value === "f";
+  $("pregField").hidden = !female;
+  if (!female) form.querySelector("input[name=preg][value=no]").checked = true;
+}
+form.querySelectorAll("input[name=sex]").forEach((r) => r.addEventListener("change", syncPreg));
+
+// ===== ตรวจข้อมูลก่อนไปขั้นถัดไป =====
+const val = (name) => form.querySelector(`input[name=${name}]:checked`)?.value;
+function err(id, msg) { $(id + "-err").textContent = msg; return !msg; }
+form.addEventListener("input", (e) => {
+  const id = e.target.id || e.target.name; const el = $(id + "-err"); if (el) el.textContent = "";
+});
+const RANGES = { age: [6, 100, "กรอกอายุระหว่าง 6–100 ปี"], height: [100, 220, "กรอกส่วนสูงระหว่าง 100–220 ซม."], weight: [20, 250, "กรอกน้ำหนักระหว่าง 20–250 กก."] };
+function validate(n) {
+  let ok = true;
+  if (n === 1) {
+    ok = err("sex", val("sex") ? "" : "เลือกเพศ") && ok;
+    for (const [id, [min, max, msg]] of Object.entries(RANGES)) {
+      const v = parseFloat($(id).value);
+      ok = err(id, isNaN(v) || v < min || v > max ? msg : "") && ok;
+    }
+    ok = err("act", val("act") ? "" : "เลือกระดับการขยับตัว") && ok;
+  }
+  if (n === 2) ok = err("goal", val("goal") ? "" : "เลือกเป้าหมาย 1 ข้อ");
+  return ok;
+}
+
+function readProfile() {
+  const all = (name) => [...form.querySelectorAll(`input[name=${name}]:checked`)].map((i) => i.value);
+  return {
+    sex: val("sex"), age: Math.round(+$("age").value), height: +$("height").value, weight: +$("weight").value,
+    pregnant: val("preg") === "yes", activity: val("act"), goal: val("goal"),
+    conditions: all("cond"), allergies: all("allergy"), other: $("other").value.trim(),
+    conditionOther: $("condOther").value.trim(), allergyOther: $("allergyOther").value.trim(),
+  };
+}
+
+// ===== สลับขั้นตอน =====
+function show(n) {
+  step = n;
+  form.querySelectorAll(".form-step").forEach((s) => (s.hidden = Number(s.dataset.step) !== n));
+  $("progress").querySelectorAll("li").forEach((li, i) => {
+    li.classList.toggle("on", i + 1 === n);
+    li.classList.toggle("done", i + 1 < n || n === 4);
+  });
+  $("backBtn").hidden = n === 1;
+  $("nextBtn").textContent = n === 3 ? "ดูผลวิเคราะห์" : n === 4 ? "บันทึกและไปหน้าหลัก" : "ถัดไป";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+$("backBtn").addEventListener("click", () => show(step - 1));
+
+// ===== แสดงผลวิเคราะห์ (สร้างด้วย DOM เพื่อป้องกันข้อความแปลก ๆ จากช่อง "อื่น ๆ") =====
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function stat(label, value, tagText, tagCls) {
+  const s = el("div", "stat"); s.append(el("small", null, label), el("strong", null, value), el("span", "tag " + (tagCls || ""), tagText)); return s;
+}
+function renderResult(p, r) {
+  const box = $("result"); box.replaceChildren();
+  box.append(el("h1", null, "ผลวิเคราะห์ของคุณ"));
+  const stats = el("div", "stats");
+  stats.append(
+    stat("ดัชนีมวลกาย (BMI)", r.bmi.toFixed(1), r.bmiLabel, r.bmiLevel),
+    r.target ? stat("พลังงานแนะนำต่อวัน", r.target.toLocaleString(), "kcal (ใช้จริง ~" + r.tdee.toLocaleString() + ")")
+             : stat("พลังงานต่อวัน", "—", "ไม่คำนวณ"),
+    stat("น้ำที่ควรดื่ม", r.waterL.toFixed(1), "ลิตรต่อวัน"));
+  box.append(stats);
+
+  // แถบ BMI วาดตามสเกลจริง 0–35
+  const wrap = el("div", "bmi-wrap"); wrap.setAttribute("aria-label", "ตำแหน่ง BMI " + r.bmi.toFixed(1));
+  const bar = el("div", "bmi-bar"); for (let i = 0; i < 5; i++) bar.append(el("i"));
+  const pin = el("span", "bmi-pin"); pin.style.left = Math.min(100, (r.bmi / 35) * 100) + "%";
+  const ticks = el("div"); ticks.style.cssText = "position:relative;height:18px;font-size:12px;color:var(--muted)";
+  [0, 18.5, 23, 25, 30, 35].forEach((t) => {
+    const s = el("span", null, String(t)); s.style.cssText = `position:absolute;left:${(t / 35) * 100}%;transform:translateX(${t === 0 ? 0 : t === 35 ? -100 : -50}%)`;
+    ticks.append(s);
+  });
+  wrap.append(bar, pin, ticks); box.append(wrap);
+
+  box.append(el("h2", null, "สิ่งที่ 3PJIC จะเน้นให้คุณ"));
+  const ul = el("ul", "notes");
+  r.notes.forEach((n) => { const li = el("li", n.type); li.append(el("b", null, n.title), document.createTextNode(n.text)); ul.append(li); });
+  if (p.other) { const li = el("li", "info"); li.append(el("b", null, "ข้อมูลเพิ่มเติม"), document.createTextNode(p.other)); ul.append(li); }
+  box.append(ul);
+  box.querySelector("h2").style.fontSize = "18px";
+  box.querySelector("h1").style.fontSize = "24px";
+}
+
+// ===== ปุ่มถัดไป / บันทึก =====
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (step < 3) { if (validate(step)) show(step + 1); return; }
+  if (step === 3) { profile = readProfile(); result = analyze(profile); renderResult(profile, result); show(4); return; }
+
+  // ขั้นที่ 4: บันทึกลง Firestore
+  setBusy($("nextBtn"), true, "กำลังบันทึก…");
+  try {
+    // มีเป้าหมายอยู่: ถ้ายังเป็นเป้าแบบเดิม ใช้แผนของเป้าหมาย ถ้าเปลี่ยนเป้าหรือเข้ากลุ่มที่ต้องปรึกษาแพทย์ ให้ยกเลิกเป้าหมายเดิม
+    let target = result.target;
+    const extra = {};
+    if (oldGoal) {
+      if (!result.special && profile.goal === oldGoal.type) target = goalPlan(oldGoal, profile, profile.weight).kcal;
+      else extra.goal = { status: "cancelled" };
+    }
+    await setDoc(doc(db, "users", user.uid), {
+      profile: { ...profile, updatedAt: serverTimestamp() },
+      plan: { bmi: result.bmi, bmiLabel: result.bmiLabel, tdee: result.tdee, target, special: result.special },
+      ...extra,
+    }, { merge: true });
+    // บันทึกน้ำหนักลงประวัติ (ครั้งแรก หรือเมื่อน้ำหนักเปลี่ยน) ใช้ทำกราฟในหน้าติดตามผล
+    if (!oldProfile || oldProfile.weight !== profile.weight) {
+      await addDoc(collection(db, "users", user.uid, "weights"), { kg: profile.weight, at: serverTimestamp() });
+    }
+    window.location.replace("app.html");
+  } catch (e2) {
+    showAlert($("formAlert"), thaiError(e2));
+    setBusy($("nextBtn"), false);
+  }
+});
+</script>
+</body>
+</html>

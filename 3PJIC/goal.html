@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>เป้าหมาย | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head">
+        <div><small id="headSub">บอกเราว่าอยากไปถึงไหน 3PJIC จะเช็กว่าปลอดภัยไหม แล้ววางแผนอาหารให้</small><h1 id="headTitle">ตั้งเป้าหมาย</h1></div>
+        <a class="btn btn-outline" href="goal.html?edit=1" id="editBtn" hidden>แก้ไขเป้าหมาย</a>
+      </div>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <!-- ตั้งเป้าแบบมีตัวเลขไม่ได้ -->
+      <section class="card" id="blocked" hidden>
+        <h2 style="font-size:20px">ยังตั้งเป้าน้ำหนักไม่ได้</h2>
+        <p style="margin:0" id="blockedText"></p>
+        <a class="btn btn-outline" href="app.html" style="align-self:flex-start;width:auto">กลับหน้าหลัก</a>
+      </section>
+
+      <!-- ===== ฟอร์มตั้งเป้าหมาย ===== -->
+      <div class="cols" id="formView" hidden>
+        <form class="card col-main goal-form" id="goalForm" novalidate>
+          <div class="seg" role="radiogroup" aria-label="ประเภทเป้าหมาย">
+            <label><input type="radio" name="gtype" value="lose" checked><span>ลดน้ำหนัก</span></label>
+            <label><input type="radio" name="gtype" value="muscle"><span>เพิ่มกล้ามเนื้อ</span></label>
+          </div>
+          <div class="row-between" style="color:var(--muted)"><span>น้ำหนักตอนนี้</span><strong style="color:var(--ink);font-variant-numeric:tabular-nums" id="curKg"></strong></div>
+          <div>
+            <label for="target" style="font-weight:500">น้ำหนักเป้าหมาย</label>
+            <div class="weight-input"><input id="target" type="number" inputmode="decimal" step="0.1" min="20" max="250"><span style="color:var(--muted)">กก.</span><span class="goal-diff" id="diffText"></span></div>
+          </div>
+          <fieldset class="plain">
+            <legend style="font-weight:500">อยากถึงภายใน</legend>
+            <div class="chips" id="weekChips"></div>
+            <small style="color:var(--muted)" id="dueText"></small>
+          </fieldset>
+        </form>
+
+        <div class="col-side" style="flex-basis:360px">
+          <div class="alert alert-error" id="errBox" hidden></div>
+          <div class="alert alert-warn" id="fastBox" hidden>
+            <strong id="fastTitle"></strong><br><span id="fastText"></span>
+            <div class="suggest-title">ลองแบบนี้แทนไหม</div>
+            <div class="suggest">
+              <button type="button" id="sugA"><b></b><span>เป้าเดิม ใช้เวลานานขึ้น</span></button>
+              <button type="button" id="sugB"><b></b><span>เวลาเดิม ลดเป้าลง</span></button>
+            </div>
+          </div>
+          <div class="alert alert-success" id="okBox" hidden><strong id="okTitle"></strong><br><span id="okText"></span></div>
+          <section class="card" id="planCard" hidden>
+            <h2 style="font-size:17px">แผนต่อวันของคุณ</h2>
+            <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+              <div class="stat"><small>พลังงาน</small><strong id="planKcal"></strong><span class="tag">kcal/วัน</span></div>
+              <div class="stat"><small>โปรตีน</small><strong id="planProtein"></strong><span class="tag">กรัม/วัน</span></div>
+            </div>
+            <p class="empty-note" id="planNote" style="margin:0"></p>
+            <button class="btn btn-primary" type="button" id="startBtn">เริ่มเป้าหมายนี้</button>
+          </section>
+          <p class="empty-note" style="margin:0">ตัวเลขเป็นค่าประมาณสำหรับผู้ใหญ่สุขภาพดี ถ้ามีโรคประจำตัวควรปรึกษาแพทย์ก่อน</p>
+        </div>
+      </div>
+
+      <!-- ===== ความคืบหน้า ===== -->
+      <div class="cols" id="progressView" hidden>
+        <div class="col-main">
+          <section class="goal-hero" aria-label="ความคืบหน้า">
+            <div class="row-between"><span id="ghTitle"></span><span class="pill" id="ghStatus"></span></div>
+            <div class="gh-num"><strong id="ghDone"></strong><span id="ghOf"></span><span class="gh-left" id="ghLeft"></span></div>
+            <div class="gh-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="ghBar"><i id="ghFill"></i></div>
+            <div class="gh-miles" id="ghMiles"></div>
+          </section>
+          <p class="alert" id="statusMsg"></p>
+          <section class="card" id="doneCard" hidden>
+            <h2 style="font-size:18px" id="doneTitle"></h2>
+            <p style="margin:0" id="doneText"></p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a class="btn btn-primary" href="goal.html?edit=1" style="width:auto">ตั้งเป้าใหม่ / ต่อเวลา</a>
+              <button class="btn btn-outline" type="button" id="keepBtn" style="width:auto">คงน้ำหนักนี้ไว้</button>
+            </div>
+          </section>
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:18px">น้ำหนักจริงเทียบแผน</h2><span id="dueChip"></span></div>
+            <div class="chart-box" id="goalChart"></div>
+            <div class="legend"><span><i class="lg-real"></i>น้ำหนักจริง</span><span><i class="lg-plan"></i>แผน</span></div>
+          </section>
+        </div>
+        <aside class="col-side">
+          <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <div class="stat"><small id="wkLabel">เป้าสัปดาห์นี้</small><strong id="wkKg"></strong><span class="tag" id="wkNote"></span></div>
+            <div class="stat"><small>แผนวันนี้</small><strong id="todayKcal"></strong><span class="tag" id="todayProtein"></span></div>
+          </div>
+          <a class="btn btn-primary" href="weights.html">บันทึกน้ำหนัก</a>
+          <section class="card">
+            <h2 style="font-size:17px" id="recTitle">เมนูที่ช่วยให้ถึงเป้า</h2>
+            <span class="empty-note" id="recSub"></span>
+            <div class="list-card" id="recList" style="border:0;padding:0"></div>
+          </section>
+          <div class="danger-box card" style="gap:8px">
+            <button class="btn btn-outline" type="button" id="cancelBtn">ยกเลิกเป้าหมาย</button>
+            <div id="cancelConfirm" hidden>
+              <p style="margin:0 0 8px">ยกเลิกเป้าหมายนี้ไหม ประวัติน้ำหนักจะยังอยู่</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-danger" type="button" id="cancelYes" style="width:auto">ยกเลิกเป้าหมาย</button>
+                <button class="btn btn-outline" type="button" id="cancelNo" style="width:auto">ไม่ใช่</button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { pageTour, PAGE_STEPS } from "./js/tour.js";
+import { markTourSeen } from "./js/firebase.js";
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { db, thaiError, setBusy, showAlert, loadWeights } from "./js/firebase.js";
+import { guard, el, thaiDate } from "./js/shell.js";
+import { GOAL_TYPES, WEEK_CHOICES, weeksLabel, goalBlocked, checkGoal, makeGoal, progressOf, progressMessage, activeGoal, goalPlan, toDate } from "./js/goal.js";
+import { analyze } from "./js/nutrition.js";
+import { FOODS, fitFor } from "./js/foods.js";
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let user, profile, data, weights = [], currentKg, weeks = 4;
+
+guard({ active: "goal", needProfile: true }, async (u, state) => {
+  pageTour("goal", PAGE_STEPS.goal, { data: state.data, save: (key) => markTourSeen(u.uid, key) });
+  user = u; data = state.data; profile = data.profile;
+  try { weights = await loadWeights(user.uid, 60); } catch (e) { weights = []; }
+  currentKg = weights[0] ? weights[0].kg : profile.weight;
+
+  const blocked = goalBlocked({ ...profile, weight: currentKg });
+  if (blocked) { $("blocked").hidden = false; $("blockedText").textContent = blocked; return; }
+
+  const goal = activeGoal(data);
+  if (goal && !params.has("edit")) showProgress(goal);
+  else showForm(goal);
+});
+
+// ===================== ฟอร์ม =====================
+function showForm(goal) {
+  $("formView").hidden = false;
+  $("curKg").textContent = currentKg.toFixed(1) + " กก.";
+  const type = goal ? goal.type : profile.goal === "muscle" || profile.goal === "gain" ? "muscle" : "lose";
+  document.querySelector(`input[name=gtype][value=${type}]`).checked = true;
+  if (goal) {
+    $("headTitle").textContent = "แก้ไขเป้าหมาย";
+    $("target").value = goal.targetKg;
+    const left = Math.max(1, Math.ceil((toDate(goal.endAt) - new Date()) / (7 * 86400000)));
+    weeks = left;
+  } else {
+    $("target").value = defaultTarget(type);
+  }
+  document.querySelectorAll("input[name=gtype]").forEach((r) => r.addEventListener("change", () => {
+    $("target").value = defaultTarget(r.value); update();
+  }));
+  $("target").addEventListener("input", update);
+  $("sugA").addEventListener("click", () => { weeks = lastCheck.suggestA.weeks; update(); $("startBtn").focus(); });
+  $("sugB").addEventListener("click", () => { $("target").value = lastCheck.suggestB.targetKg.toFixed(1); update(); $("startBtn").focus(); });
+  $("startBtn").addEventListener("click", startGoal);
+  update();
+}
+
+function defaultTarget(type) {
+  return (type === "lose" ? currentKg - 2 : currentKg + 1).toFixed(1);
+}
+
+let lastCheck = null;
+function update() {
+  const type = document.querySelector("input[name=gtype]:checked").value;
+  const g = GOAL_TYPES[type];
+  const targetKg = parseFloat($("target").value);
+  const c = checkGoal({ type, currentKg, targetKg, weeks, profile });
+  lastCheck = c;
+
+  // ปุ่มเลือกระยะเวลา
+  const list = WEEK_CHOICES.includes(weeks) ? WEEK_CHOICES : [...WEEK_CHOICES, weeks].sort((a, b) => a - b);
+  $("weekChips").replaceChildren(...list.map((w) => {
+    const b = el("button", "chip" + (w === weeks ? " on" : ""), weeksLabel(w));
+    b.type = "button"; b.setAttribute("aria-pressed", String(w === weeks));
+    b.onclick = () => { weeks = w; update(); };
+    return b;
+  }));
+  const due = new Date(Date.now() + weeks * 7 * 86400000);
+  $("dueText").textContent = "ถึงเป้าประมาณ " + thaiDate(due);
+  $("diffText").textContent = c.diff > 0 ? g.verb + " " + c.diff.toFixed(1) + " กก." : "";
+
+  $("errBox").hidden = !c.error;
+  if (c.error) { $("errBox").replaceChildren(el("strong", null, c.error.title), el("br"), document.createTextNode(c.error.text)); }
+  $("fastBox").hidden = !c.fast;
+  if (c.fast) {
+    $("fastTitle").textContent = g.verb + "สัปดาห์ละ " + c.rate.toFixed(1) + " กก. เร็วเกินไป";
+    $("fastText").textContent = type === "lose"
+      ? "ช่วงที่ปลอดภัยคือ 0.5–1 กก./สัปดาห์ ลดเร็วกว่านี้มักเสียกล้ามเนื้อ และน้ำหนักเด้งกลับง่าย"
+      : "กล้ามเนื้อเพิ่มได้จริงราว 0.25–0.5 กก./สัปดาห์ น้ำหนักที่ขึ้นเร็วกว่านี้มักเป็นไขมัน";
+    $("sugA").querySelector("b").textContent = g.verb + " " + c.diff.toFixed(1) + " กก. ใน " + c.suggestA.weeks + " สัปดาห์";
+    $("sugB").querySelector("b").textContent = g.verb + " " + c.suggestB.amount.toFixed(1) + " กก. ใน " + weeks + " สัปดาห์";
+  }
+  $("okBox").hidden = !c.ok; $("planCard").hidden = !c.ok;
+  if (c.ok) {
+    $("okTitle").textContent = g.verb + "สัปดาห์ละ " + c.rate.toFixed(2) + " กก. " +
+      (type === "lose" ? (c.rate <= 0.5 ? "ค่อยเป็นค่อยไป ทำต่อเนื่องได้ง่าย" : "อยู่ในช่วงที่ปลอดภัย") : "อยู่ในช่วงที่ทำได้จริง");
+    $("okText").textContent = type === "lose"
+      ? "เป้าย่อยสัปดาห์แรก: " + (currentKg - c.rate).toFixed(1) + " กก."
+      : "ต้องฝึกเวทสัปดาห์ละ 2–3 ครั้งควบคู่ด้วย";
+    $("planKcal").textContent = c.kcal.toLocaleString();
+    $("planProtein").textContent = c.protein;
+    $("planNote").textContent = type === "lose"
+      ? "กินน้อยกว่าที่ร่างกายใช้ (≈ " + c.tdee.toLocaleString() + " kcal) วันละ " + (c.tdee - c.kcal).toLocaleString() + " kcal และไม่ต่ำกว่า " + c.floor.toLocaleString() + " kcal · เมนูแนะนำจะเน้นแคลอรี่ต่ำ โปรตีนสูง"
+      : "กินมากกว่าที่ร่างกายใช้ (≈ " + c.tdee.toLocaleString() + " kcal) วันละ 250 kcal · โปรตีน 1.6 กรัมต่อน้ำหนักตัว 1 กก. · เมนูแนะนำจะเน้นโปรตีนสูง";
+  }
+}
+
+async function startGoal() {
+  const c = lastCheck;
+  if (!c || !c.ok) return;
+  const type = document.querySelector("input[name=gtype]:checked").value;
+  const goal = makeGoal(type, currentKg, parseFloat($("target").value), weeks);
+  setBusy($("startBtn"), true, "กำลังบันทึก…");
+  try {
+    const r = analyze({ ...profile, weight: currentKg, goal: type });
+    await setDoc(doc(db, "users", user.uid), {
+      goal,
+      profile: { goal: type, weight: currentKg },
+      plan: { bmi: r.bmi, bmiLabel: r.bmiLabel, tdee: c.tdee, target: c.kcal, special: r.special },
+    }, { merge: true });
+    location.replace("goal.html?started=1");
+  } catch (e) { showAlert($("formAlert"), thaiError(e)); setBusy($("startBtn"), false); }
+}
+
+// ===================== ความคืบหน้า =====================
+function showProgress(goal) {
+  $("progressView").hidden = false; $("editBtn").hidden = false;
+  $("headTitle").textContent = "เป้าหมายของฉัน";
+  $("headSub").textContent = "บันทึกน้ำหนักสัปดาห์ละครั้ง แล้วดูว่าเดินตามแผนไหม";
+  if (params.has("started")) showAlert($("formAlert"), "เริ่มเป้าหมายแล้ว แผนอาหารและเมนูแนะนำปรับตามเป้าหมายนี้", "success");
+
+  const g = GOAL_TYPES[goal.type];
+  const p = progressOf(goal, currentKg);
+  $("ghTitle").textContent = g.verb + " " + p.total.toFixed(1) + " กก. ภายใน " + weeksLabel(goal.weeks);
+  $("ghStatus").textContent = p.reached ? "ถึงเป้าแล้ว" : p.expired ? "ครบกำหนด" : p.statusLabel;
+  $("ghDone").textContent = p.done.toFixed(1);
+  $("ghOf").textContent = " จาก " + p.total.toFixed(1) + " กก.";
+  $("ghLeft").textContent = p.expired ? "" : "เหลือ " + (p.daysLeft >= 7 ? p.weeksLeft + " สัปดาห์" : p.daysLeft + " วัน");
+  $("ghBar").setAttribute("aria-valuenow", p.pct);
+  $("ghBar").setAttribute("aria-label", "ความคืบหน้า " + p.pct + "%");
+  $("ghFill").style.width = p.pct + "%";
+  $("ghMiles").replaceChildren(...[25, 50, 75, 100].map((m) => el("span", p.pct >= m ? "on" : "", (m === 100 ? "ถึงเป้า" : m + "%") + (p.pct >= m ? " ✓" : ""))));
+  $("statusMsg").className = "alert " + (p.reached ? "alert-success" : p.status === "behind" || (p.status === "ahead" && goal.type === "lose") ? "alert-warn" : "alert-success");
+  $("statusMsg").textContent = progressMessage(goal, p);
+  $("dueChip").textContent = "ถึงเป้า " + thaiDate(p.end);
+
+  if (p.reached || p.expired) {
+    $("doneCard").hidden = false;
+    $("doneTitle").textContent = p.reached ? "ถึงเป้าหมายแล้ว!" : "ครบกำหนดเป้าหมายแล้ว";
+    $("doneText").textContent = p.reached ? "จะตั้งเป้าต่อ หรือคงน้ำหนักนี้ไว้ก็ได้" : "ตั้งเป้าใหม่จากน้ำหนักตอนนี้ ขยายเวลา หรือคงน้ำหนักไว้ก็ได้";
+  }
+
+  const plan = goalPlan(goal, profile, currentKg);
+  $("wkLabel").textContent = "เป้าสัปดาห์ที่ " + p.weekNo;
+  $("wkKg").textContent = p.weekTargetKg.toFixed(1) + " กก.";
+  const toWeek = Math.round((currentKg - p.weekTargetKg) * (goal.type === "lose" ? 1 : -1) * 10) / 10;
+  $("wkNote").textContent = toWeek > 0 ? "อีก " + toWeek.toFixed(1) + " กก." : "ถึงแล้ว";
+  $("todayKcal").textContent = plan.kcal.toLocaleString() + " kcal";
+  $("todayProtein").textContent = "โปรตีน " + plan.protein + " ก.";
+
+  renderGoalChart(goal, p);
+  renderRecs(goal);
+
+  $("cancelBtn").onclick = () => { $("cancelConfirm").hidden = false; $("cancelBtn").hidden = true; $("cancelYes").focus(); };
+  $("cancelNo").onclick = () => { $("cancelConfirm").hidden = true; $("cancelBtn").hidden = false; };
+  $("cancelYes").onclick = () => endGoal("cancelled", $("cancelYes"));
+  $("keepBtn").onclick = () => endGoal("done", $("keepBtn"));
+}
+
+async function endGoal(status, btn) {
+  setBusy(btn, true, "กำลังบันทึก…");
+  try {
+    const prof = { ...profile, weight: currentKg, goal: "keep" };
+    const r = analyze(prof);
+    await setDoc(doc(db, "users", user.uid), {
+      goal: { status },
+      profile: { goal: "keep" },
+      plan: { bmi: r.bmi, bmiLabel: r.bmiLabel, tdee: r.tdee, target: r.target, special: r.special },
+    }, { merge: true });
+    location.replace("goal.html");
+  } catch (e) { showAlert($("formAlert"), thaiError(e)); setBusy(btn, false); }
+}
+
+// กราฟตามเวลาจริง: เส้นแผน (ประ) + น้ำหนักจริงตั้งแต่เริ่มเป้าหมาย
+function renderGoalChart(goal, p) {
+  const start = p.start.getTime(), end = p.end.getTime();
+  const pts = [{ t: start, kg: goal.startKg }, ...weights.filter((w) => w.at.getTime() > start).reverse().map((w) => ({ t: Math.min(w.at.getTime(), end), kg: w.kg }))];
+  const W = Math.max(320, Math.round($("goalChart").clientWidth || 560)), H = 240, L = 44, R = 20, T = 24, B = 40;
+  const ks = [goal.startKg, goal.targetKg, ...pts.map((x) => x.kg)];
+  const lo = Math.floor(Math.min(...ks) - 0.5), hi = Math.ceil(Math.max(...ks) + 0.5);
+  const x = (t) => L + ((t - start) / (end - start)) * (W - L - R);
+  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `กราฟเป้าหมาย เริ่ม ${goal.startKg} กก. เป้า ${goal.targetKg} กก. ล่าสุด ${currentKg} กก.`);
+  const add = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.append(n); return n; };
+  const step = Math.max(1, Math.ceil((hi - lo) / 4));
+  for (let v = lo; v <= hi; v += step) {
+    add("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "#e6ece8" });
+    add("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 12, fill: "#5d6b63" }, v);
+  }
+  add("line", { x1: L, x2: W - R, y1: y(goal.targetKg), y2: y(goal.targetKg), stroke: "#1f7a52", "stroke-opacity": 0.35 });
+  add("text", { x: W - R, y: y(goal.targetKg) + (goal.type === "lose" ? 16 : -8), "text-anchor": "end", "font-size": 12, fill: "#1f7a52" }, "เป้า " + goal.targetKg.toFixed(1));
+  add("line", { x1: x(start), y1: y(goal.startKg), x2: x(end), y2: y(goal.targetKg), stroke: "#7d8c84", "stroke-width": 2, "stroke-dasharray": "6 6" });
+  add("polyline", { points: pts.map((q) => `${x(q.t)},${y(q.kg)}`).join(" "), fill: "none", stroke: "#1f7a52", "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round" });
+  pts.forEach((q, i) => {
+    const lastPt = i === pts.length - 1;
+    add("circle", { cx: x(q.t), cy: y(q.kg), r: lastPt ? 6 : 4, fill: lastPt ? "#ffffff" : "#1f7a52", stroke: "#1f7a52", "stroke-width": lastPt ? 3 : 0 });
+  });
+  const lp = pts[pts.length - 1];
+  add("text", { x: x(lp.t) + 10, y: y(lp.kg) - 10, "font-size": 13, "font-weight": 600, fill: "#1d2a24" }, lp.kg.toFixed(1));
+  add("text", { x: L, y: H - 14, "font-size": 12, fill: "#5d6b63" }, thaiDate(p.start, { day: "numeric", month: "short" }));
+  add("text", { x: W - R, y: H - 14, "text-anchor": "end", "font-size": 12, fill: "#5d6b63" }, thaiDate(p.end, { day: "numeric", month: "short" }));
+  $("goalChart").replaceChildren(svg);
+}
+
+// เมนูที่ช่วยให้ถึงเป้า จากข้อมูลสารอาหารจริง (Thai FCD) และเหมาะกับผู้ใช้
+function renderRecs(goal) {
+  const pool = FOODS.filter((f) => f.n && f.n.kcal && ["food", "store", "snack"].includes(f.cat) && fitFor(f, profile).ok && f.n.p >= 8);
+  const score = goal.type === "lose" ? (f) => f.n.p / f.n.kcal : (f) => f.n.p;
+  const top = pool.sort((a, b) => score(b) - score(a)).slice(0, 4);
+  $("recSub").textContent = goal.type === "lose" ? "โปรตีนสูงเมื่อเทียบกับแคลอรี่ (ค่าต่อ 100 ก. จาก Thai FCD)" : "โปรตีนสูง (ค่าต่อ 100 ก. จาก Thai FCD)";
+  $("recList").replaceChildren(...(top.length ? top.map((f) => {
+    const a = el("a"); a.href = "food.html?id=" + encodeURIComponent(f.id);
+    a.append(el("span", null, f.name), el("small", null, Math.round(f.n.kcal) + " kcal · โปรตีน " + Math.round(f.n.p) + " ก."));
+    return a;
+  }) : [el("span", "empty-note", "ยังไม่มีเมนูที่เหมาะกับข้อจำกัดของคุณ")]));
+}
+</script>
+</body>
+</html>

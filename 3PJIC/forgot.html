@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ลืมรหัสผ่าน | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html">3PJIC</a>
+    <h2>ตั้งรหัสผ่านใหม่ได้ด้วยตัวเอง</h2>
+    <span class="foot">ลิงก์ในอีเมลใช้ได้ครั้งเดียวและมีอายุจำกัด</span>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <a class="brand brand-mobile" href="index.html">3PJIC</a>
+      <h1>ลืมรหัสผ่าน</h1>
+      <p class="sub">กรอกอีเมลที่ใช้สมัคร เราจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้</p>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <form id="forgotForm" novalidate style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input id="email" type="email" autocomplete="email" inputmode="email" required>
+          <span class="field-error" id="email-err"></span>
+        </div>
+        <button class="btn btn-primary" type="submit" id="submitBtn">ส่งลิงก์ตั้งรหัสใหม่</button>
+      </form>
+
+      <p class="center-note"><a href="login.html">กลับไปหน้าเข้าสู่ระบบ</a></p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { auth, thaiError, setBusy, showAlert, warnIfNotConfigured } from "./js/firebase.js";
+
+const $ = (id) => document.getElementById(id);
+const alertBox = $("formAlert");
+warnIfNotConfigured(alertBox);
+$("email").addEventListener("input", () => { $("email-err").textContent = ""; $("email").setAttribute("aria-invalid", "false"); });
+
+$("forgotForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("email").value.trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    $("email-err").textContent = "กรอกอีเมลให้ถูกต้อง เช่น name@example.com";
+    $("email").setAttribute("aria-invalid", "true");
+    return;
+  }
+  setBusy($("submitBtn"), true, "กำลังส่ง…");
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (err) {
+    // ปัญหาเครือข่ายหรือการตั้งค่า แจ้งผู้ใช้ตามจริง
+    if (err.code === "auth/network-request-failed" || err.code === "auth/too-many-requests" || err.code === "auth/invalid-email") {
+      showAlert(alertBox, thaiError(err));
+      setBusy($("submitBtn"), false);
+      return;
+    }
+    // กรณีอื่น (เช่น ไม่มีบัญชีนี้) แสดงข้อความเดียวกับกรณีสำเร็จ เพื่อไม่บอกว่าอีเมลไหนมีบัญชี
+  }
+  showAlert(alertBox, "ถ้ามีบัญชีที่ใช้อีเมลนี้ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปแล้ว เช็กกล่องจดหมาย (รวมถึงโฟลเดอร์สแปม)", "success");
+  setBusy($("submitBtn"), false);
+});
+</script>
+</body>
+</html>

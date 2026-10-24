@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ปรับโปรแกรม | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner" style="max-width:560px">
+      <nav aria-label="ตำแหน่งหน้า" style="font-size:14px;color:var(--muted)"><a href="exercise.html">โปรแกรมของฉัน</a> / ปรับโปรแกรม</nav>
+      <div class="page-head"><div><small>เป้าหมาย อายุ และโรคประจำตัว ดึงจากแบบประเมินอัตโนมัติ</small><h1>ปรับโปรแกรม</h1></div></div>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <section class="card" style="gap:6px;font-size:15px">
+        <h2 style="font-size:17px">ข้อมูลจากแบบประเมิน</h2>
+        <div class="row-between"><span style="color:var(--muted)">เป้าหมาย</span><span id="pGoal"></span></div>
+        <div class="row-between"><span style="color:var(--muted)">อายุ · กิจกรรม</span><span id="pAge"></span></div>
+        <div class="row-between"><span style="color:var(--muted)">โรคประจำตัว</span><span id="pCond" style="text-align:right"></span></div>
+        <a href="assessment.html" style="font-weight:600">แก้ในแบบประเมิน</a>
+      </section>
+
+      <fieldset class="plain">
+        <legend style="font-weight:600;font-size:17px">1. มีอุปกรณ์อะไรบ้าง</legend>
+        <div id="equip" style="display:flex;flex-direction:column;gap:8px"></div>
+      </fieldset>
+      <fieldset class="plain">
+        <legend style="font-weight:600;font-size:17px">2. ว่างออกกำลังกายสัปดาห์ละกี่วัน</legend>
+        <div class="days4" id="days"></div>
+        <p class="alert alert-success" style="margin:0" id="preview"></p>
+      </fieldset>
+      <button class="btn btn-primary" type="button" id="save">บันทึกและสร้างโปรแกรมใหม่</button>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { db, thaiError, showAlert, setBusy } from "./js/firebase.js";
+import { guard, el } from "./js/shell.js";
+import { GOALS, CONDITIONS, ACTIVITY } from "./js/nutrition.js";
+import { EQUIP, DAY_CHOICES, DAY_SHORT, exerciseBlocked, defaultSettings, buildProgram } from "./js/exercise.js";
+
+const $ = (id) => document.getElementById(id);
+let user, profile, cur;
+
+guard({ active: "track", needProfile: true }, async (u, state) => {
+  user = u; profile = state.data.profile;
+  if (exerciseBlocked(profile)) return location.replace("exercise.html");
+  cur = Object.assign(defaultSettings(profile), state.data.exercise || {});
+  $("pGoal").textContent = GOALS[profile.goal].label;
+  $("pAge").textContent = profile.age + " ปี · " + ACTIVITY[profile.activity];
+  const c = (profile.conditions || []).map((k) => CONDITIONS[k]?.label).filter(Boolean);
+  $("pCond").textContent = c.length ? c.join(", ") : "ไม่มี";
+  render();
+});
+
+function render() {
+  $("equip").replaceChildren(...Object.entries(EQUIP).map(([k, v]) => {
+    const b = el("button", "opt"); b.type = "button"; b.setAttribute("aria-pressed", cur.equip === k ? "true" : "false");
+    b.append(document.createTextNode(v.label), el("span", null, v.sub));
+    b.onclick = () => { cur.equip = k; render(); };
+    return b;
+  }));
+  $("days").replaceChildren(...DAY_CHOICES.map((d) => {
+    const b = el("button", "opt", d + " วัน"); b.type = "button"; b.setAttribute("aria-pressed", cur.days === d ? "true" : "false");
+    b.onclick = () => { cur.days = d; render(); };
+    return b;
+  }));
+  const p = buildProgram(profile, cur);
+  const on = p.days.map((d, i) => (d.kind === "rest" ? null : DAY_SHORT[i])).filter(Boolean);
+  $("preview").replaceChildren(el("span", null, "ฝึกวัน "), el("strong", null, on.join(" · ")), el("br"), document.createTextNode(p.target));
+}
+
+$("save").onclick = async () => {
+  setBusy($("save"), true, "กำลังบันทึก…");
+  try {
+    await setDoc(doc(db, "users", user.uid), { exercise: { equip: cur.equip, days: cur.days, swaps: {} } }, { merge: true });
+    location.href = "exercise.html";
+  } catch (e) { setBusy($("save"), false); showAlert($("formAlert"), thaiError(e)); }
+};
+</script>
+</body>
+</html>

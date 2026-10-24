@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ติดตามผล | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head"><div><small>บันทึกน้ำหนักและการออกกำลังกาย</small><h1>ติดตามผล</h1></div></div>
+      <nav class="tabs2" aria-label="ประเภทการติดตาม"><span aria-current="page">น้ำหนัก</span><a href="exercise.html">ออกกำลังกาย</a></nav>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <div class="cols">
+        <div class="col-side" style="flex-basis:300px">
+          <form class="card" id="weightForm" novalidate>
+            <label for="kg" style="font-weight:500">น้ำหนักวันนี้</label>
+            <div class="weight-input"><input id="kg" type="number" inputmode="decimal" step="0.1" min="20" max="250"><span style="color:var(--muted)">กก.</span></div>
+            <span class="field-error" id="kg-err"></span>
+            <span style="font-size:14px;color:var(--muted)" id="prevNote"></span>
+            <div class="alert alert-warn" id="oddBox" hidden>
+              <strong id="oddTitle"></strong><br>ต่างจากครั้งก่อนเกิน 10% ลองตรวจตัวเลขอีกครั้ง
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                <button class="btn btn-primary" type="button" id="oddYes" style="width:auto;min-height:40px">ถูกต้อง บันทึกเลย</button>
+                <button class="btn btn-outline" type="button" id="oddNo" style="width:auto;min-height:40px">แก้ตัวเลข</button>
+              </div>
+            </div>
+            <button class="btn btn-primary" type="submit" id="saveBtn">บันทึก</button>
+          </form>
+          <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr))" id="bmiStats"></div>
+          <a class="card goal-mini" href="goal.html" id="goalMini" hidden></a>
+        </div>
+
+        <div class="col-main">
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:18px">น้ำหนักที่ผ่านมา</h2><span id="trend"></span></div>
+            <div class="chart-box" id="chart"></div>
+            <p class="empty-note" id="chartNote"></p>
+          </section>
+          <div class="alert alert-error" id="fastWarn" hidden></div>
+          <section class="card">
+            <h2 style="font-size:18px">ประวัติ</h2>
+            <ul class="history" id="history"></ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { pageTour, PAGE_STEPS } from "./js/tour.js";
+import { markTourSeen } from "./js/firebase.js";
+import { doc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { db, thaiError, setBusy, showAlert, loadWeights } from "./js/firebase.js";
+import { guard, el, thaiDate } from "./js/shell.js";
+import { analyze, bmiOf, bmiInfo } from "./js/nutrition.js";
+import { activeGoal, goalPlan, progressOf, GOAL_TYPES } from "./js/goal.js";
+
+const $ = (id) => document.getElementById(id);
+let user, profile, goal = null, weights = [], confirmedOdd = false;
+
+guard({ active: "track", needProfile: true }, async (u, state) => {
+  pageTour("weights", PAGE_STEPS.weights, { data: state.data, save: (key) => markTourSeen(u.uid, key) });
+  user = u; profile = state.data.profile;
+  goal = analyze(profile).special ? null : activeGoal(state.data);
+  await refresh();
+  $("kg").value = weights[0] ? weights[0].kg : profile.weight;
+});
+
+async function refresh() {
+  try { weights = await loadWeights(user.uid, 30); }
+  catch (e) { showAlert($("formAlert"), thaiError(e)); weights = []; }
+  const last = weights[0];
+  $("prevNote").textContent = last ? "ครั้งก่อน " + last.kg.toFixed(1) + " กก. เมื่อ " + thaiDate(last.at) : "ยังไม่มีประวัติ";
+  renderStats(last ? last.kg : profile.weight);
+  renderGoal(last ? last.kg : profile.weight);
+  renderChart();
+  renderHistory();
+  checkFastLoss();
+}
+
+// ---- BMI ตอนนี้ และอีกเท่าไรถึงเกณฑ์ปกติ ----
+function renderStats(kg) {
+  const bmi = bmiOf(kg, profile.height), info = bmiInfo(bmi);
+  const h = profile.height / 100;
+  let gapText = "อยู่ในเกณฑ์ปกติแล้ว", gapVal = "✓";
+  if (bmi >= 23) { gapVal = (kg - 22.9 * h * h).toFixed(1) + " กก."; gapText = "ลดอีกเท่านี้ BMI จะต่ำกว่า 23"; }
+  else if (bmi < 18.5) { gapVal = (18.5 * h * h - kg).toFixed(1) + " กก."; gapText = "เพิ่มอีกเท่านี้ BMI จะถึง 18.5"; }
+  const stat = (a, b, c, cls) => { const s = el("div", "stat"); s.append(el("small", null, a), el("strong", null, b), el("span", "tag " + (cls || ""), c)); return s; };
+  $("bmiStats").replaceChildren(stat("BMI ตอนนี้", bmi.toFixed(1), info.label, info.level), stat("ถึงเกณฑ์ปกติ", gapVal, gapText));
+}
+
+// ---- กราฟเส้น วาดตามสเกลจริง ----
+function renderChart() {
+  const pts = weights.slice(0, 12).reverse();
+  const box = $("chart");
+  if (pts.length < 2) { box.replaceChildren(); $("chartNote").textContent = "บันทึกอย่างน้อย 2 ครั้งเพื่อดูกราฟ"; $("trend").textContent = ""; return; }
+  $("chartNote").textContent = "";
+  const W = Math.max(320, Math.round(box.clientWidth || 560)), H = 240, L = 44, R = 20, T = 28, B = 40;
+  const ks = pts.map((p) => p.kg);
+  const rangeKs = goal ? [...ks, goal.targetKg] : ks;
+  let lo = Math.floor(Math.min(...rangeKs) - 0.5), hi = Math.ceil(Math.max(...rangeKs) + 0.5);
+  if (hi - lo < 2) { lo -= 1; hi += 1; }
+  const x = (i) => L + (i * (W - L - R)) / (pts.length - 1);
+  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `กราฟน้ำหนัก ${pts.length} ครั้งล่าสุด จาก ${ks[0]} เป็น ${ks[ks.length - 1]} กิโลกรัม`);
+  const add = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.append(n); return n; };
+  const step = Math.max(1, Math.ceil((hi - lo) / 4));
+  for (let v = lo; v <= hi; v += step) {
+    add("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "#e6ece8" });
+    add("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 12, fill: "#5d6b63" }, v);
+  }
+  if (goal) {
+    add("line", { x1: L, x2: W - R, y1: y(goal.targetKg), y2: y(goal.targetKg), stroke: "#1f7a52", "stroke-opacity": 0.4, "stroke-dasharray": "6 6" });
+    add("text", { x: W - R, y: y(goal.targetKg) + (goal.type === "lose" ? 16 : -8), "text-anchor": "end", "font-size": 12, fill: "#1f7a52" }, "เป้า " + goal.targetKg.toFixed(1));
+  }
+  add("polyline", { points: pts.map((p, i) => `${x(i)},${y(p.kg)}`).join(" "), fill: "none", stroke: "#1f7a52", "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round" });
+  pts.forEach((p, i) => {
+    const lastPt = i === pts.length - 1;
+    add("circle", { cx: x(i), cy: y(p.kg), r: lastPt ? 6 : 4, fill: lastPt ? "#ffffff" : "#1f7a52", stroke: "#1f7a52", "stroke-width": lastPt ? 3 : 0 });
+    if (i === 0 || lastPt || pts.length <= 6) {
+      add("text", { x: x(i), y: H - 14, "text-anchor": i === 0 ? "start" : lastPt ? "end" : "middle", "font-size": 12, fill: "#5d6b63" }, thaiDate(p.at, { day: "numeric", month: "short" }));
+    }
+  });
+  const lp = pts[pts.length - 1];
+  add("text", { x: x(pts.length - 1), y: y(lp.kg) - 12, "text-anchor": "end", "font-size": 13, "font-weight": 600, fill: "#1d2a24" }, lp.kg.toFixed(1));
+  box.replaceChildren(svg);
+  const diff = Math.round((lp.kg - pts[0].kg) * 10) / 10;
+  $("trend").textContent = diff === 0 ? "คงที่" : (diff < 0 ? "ลดลง " : "เพิ่มขึ้น ") + Math.abs(diff).toFixed(1) + " กก.";
+}
+
+// ---- การ์ดเป้าหมาย ----
+function renderGoal(kg) {
+  const box = $("goalMini");
+  if (!goal) { box.hidden = true; return; }
+  const pr = progressOf(goal, kg);
+  const head = el("div", "section-head"); head.append(el("h2", null, "เป้าหมาย"), el("span", null, pr.reached ? "ถึงเป้าแล้ว" : pr.statusLabel));
+  head.querySelector("h2").style.fontSize = "17px";
+  const bar = el("div", "gh-bar"); const fill = el("i"); fill.style.width = pr.pct + "%"; bar.append(fill);
+  bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuenow", pr.pct); bar.setAttribute("aria-valuemin", 0); bar.setAttribute("aria-valuemax", 100); bar.setAttribute("aria-label", "ความคืบหน้าเป้าหมาย");
+  box.replaceChildren(head, el("span", null, GOAL_TYPES[goal.type].verb + "ไปแล้ว " + pr.done.toFixed(1) + " จาก " + pr.total.toFixed(1) + " กก. · เป้าสัปดาห์นี้ " + pr.weekTargetKg.toFixed(1) + " กก."), bar);
+  box.hidden = false;
+}
+
+function renderHistory() {
+  $("history").replaceChildren(...(weights.length ? weights.slice(0, 10).map((w) => {
+    const li = el("li"); li.append(el("small", null, thaiDate(w.at)), el("span", null, w.kg.toFixed(1) + " กก.")); return li;
+  }) : [el("li", null, "ยังไม่มีประวัติ")]));
+}
+
+// ---- User flow: น้ำหนักลดเร็วเกินไป (เฉลี่ยเกิน 1 กก./สัปดาห์ ในช่วง 2 สัปดาห์ขึ้นไป) ----
+function checkFastLoss() {
+  const now = weights[0]; const box = $("fastWarn"); box.hidden = true;
+  if (!now) return;
+  const older = weights.find((w) => (now.at - w.at) / 86400000 >= 14);
+  if (!older) return;
+  const days = (now.at - older.at) / 86400000;
+  const perWeek = ((older.kg - now.kg) / days) * 7;
+  if (perWeek > 1) {
+    box.hidden = false;
+    box.textContent = "น้ำหนักลดเฉลี่ย " + perWeek.toFixed(1) + " กก. ต่อสัปดาห์ ซึ่งเร็วกว่าที่แนะนำ (ไม่เกิน 1 กก.) ไม่ควรลดอาหารลงอีก และควรปรึกษาแพทย์หรือนักกำหนดอาหาร";
+  }
+}
+
+// ---- บันทึกน้ำหนัก (ถามยืนยันเมื่อตัวเลขผิดปกติ) ----
+$("kg").addEventListener("input", () => { $("kg-err").textContent = ""; $("kg").setAttribute("aria-invalid", "false"); $("oddBox").hidden = true; confirmedOdd = false; });
+$("oddNo").addEventListener("click", () => { $("oddBox").hidden = true; $("kg").focus(); $("kg").select(); });
+$("oddYes").addEventListener("click", () => { confirmedOdd = true; $("oddBox").hidden = true; save(); });
+$("weightForm").addEventListener("submit", (e) => { e.preventDefault(); save(); });
+
+async function save() {
+  const kg = Math.round(parseFloat($("kg").value) * 10) / 10;
+  if (isNaN(kg) || kg < 20 || kg > 250) { $("kg-err").textContent = "กรอกน้ำหนักระหว่าง 20–250 กก."; $("kg").setAttribute("aria-invalid", "true"); return; }
+  const last = weights[0];
+  if (last && !confirmedOdd && Math.abs(kg - last.kg) / last.kg > 0.1) {
+    $("oddTitle").textContent = "น้ำหนัก " + kg.toFixed(1) + " กก. ถูกต้องไหม";
+    $("oddBox").hidden = false; $("kg").setAttribute("aria-invalid", "true"); return;
+  }
+  setBusy($("saveBtn"), true, "กำลังบันทึก…");
+  try {
+    await addDoc(collection(db, "users", user.uid, "weights"), { kg, at: serverTimestamp() });
+    // อัปเดตโปรไฟล์และแผนด้วยน้ำหนักใหม่ (แผนปรับให้อัตโนมัติตาม User flow)
+    profile = { ...profile, weight: kg };
+    const r = analyze(profile);
+    if (goal) r.target = goalPlan(goal, profile, kg).kcal; // มีเป้าหมาย: แผนตามเป้าหมาย
+    await setDoc(doc(db, "users", user.uid), {
+      profile: { weight: kg },
+      plan: { bmi: r.bmi, bmiLabel: r.bmiLabel, tdee: r.tdee, target: r.target, special: r.special },
+    }, { merge: true });
+    confirmedOdd = false;
+    showAlert($("formAlert"), "บันทึกแล้ว พลังงานแนะนำต่อวันปรับเป็น " + (r.target ? r.target.toLocaleString() + " kcal" : "ตามคำแนะนำเดิม"), "success");
+    await refresh();
+  } catch (e) { showAlert($("formAlert"), thaiError(e)); }
+  setBusy($("saveBtn"), false);
+}
+</script>
+</body>
+</html>

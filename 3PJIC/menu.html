@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ค้นหาเมนู | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head"><div><small>อยากกินอะไร เช็กก่อนว่าเหมาะกับคุณไหม</small><h1>ค้นหาเมนู</h1></div></div>
+
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>
+        <input id="q" type="search" placeholder="เช่น กะเพรา, ชานม, ส้มตำ" aria-label="ค้นหาเมนู" autocomplete="off">
+      </div>
+      <div class="cat-tabs" id="tabs" role="toolbar" aria-label="หมวดหมู่"></div>
+      <div class="filter-row">
+        <span id="count" aria-live="polite"></span>
+        <label class="check" for="onlyFit" style="font-size:14px;color:var(--ink)"><input id="onlyFit" type="checkbox">แสดงเฉพาะที่เหมาะกับฉัน</label>
+      </div>
+      <div class="food-grid" id="grid"></div>
+      <p class="fine">ป้ายและสารก่อภูมิแพ้คิดจากส่วนผสมทั่วไปของแต่ละเมนู สูตรแต่ละร้านอาจต่างกัน ถ้าแพ้อาหาร ควรถามร้านทุกครั้ง · ไอคอนอาหารออกแบบโดยทีม 3PJIC</p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { pageTour, PAGE_STEPS } from "./js/tour.js";
+import { markTourSeen } from "./js/firebase.js";
+import { guard, el } from "./js/shell.js";
+import { FOODS, CATEGORIES, fitFor } from "./js/foods.js";
+import { foodCard } from "./js/food-ui.js";
+
+const $ = (id) => document.getElementById(id);
+let profile = null, cat = "all";
+
+// จำหมวดที่เลือกและคำค้นจากลิงก์ เช่น menu.html?cat=drink&q=ชา
+const params = new URLSearchParams(location.search);
+if (params.get("cat") && CATEGORIES[params.get("cat")]) cat = params.get("cat");
+$("q").value = params.get("q") || "";
+
+guard({ active: "search" }, (user, state) => {
+  pageTour("menu", PAGE_STEPS.menu, { data: state.data, save: (key) => markTourSeen(user.uid, key) });
+  profile = state.data.profile || null;
+  $("onlyFit").disabled = !profile;
+  if (!profile) $("onlyFit").parentElement.title = "ทำแบบประเมินก่อนเพื่อใช้ตัวกรองนี้";
+  renderTabs(); render();
+});
+
+// ค้นแบบไม่สนช่องว่างและตัวพิมพ์ ค้นได้ทั้งชื่อหลักและชื่ออื่น
+const norm = (s) => s.toLowerCase().replace(/\s+/g, "");
+function matches(f, q) {
+  if (!q) return true;
+  return [f.name, ...f.aliases].some((n) => norm(n).includes(q));
+}
+
+function renderTabs() {
+  const tabs = [["all", "ทั้งหมด"], ...Object.entries(CATEGORIES)];
+  $("tabs").replaceChildren(...tabs.map(([k, label]) => {
+    const b = el("button"); b.type = "button"; b.setAttribute("aria-pressed", k === cat);
+    b.append(label, el("span", "n", String(k === "all" ? FOODS.length : FOODS.filter((f) => f.cat === k).length)));
+    b.onclick = () => { cat = k; renderTabs(); render(); };
+    return b;
+  }));
+}
+
+function render() {
+  const q = norm($("q").value);
+  const onlyFit = $("onlyFit").checked;
+  let list = FOODS.filter((f) => (cat === "all" || f.cat === cat) && matches(f, q));
+  if (onlyFit) list = list.filter((f) => fitFor(f, profile).ok);
+  // เมนูที่เหมาะกับผู้ใช้ขึ้นก่อน
+  list.sort((a, b) => Number(!fitFor(a, profile).ok) - Number(!fitFor(b, profile).ok));
+  $("count").textContent = list.length + " เมนู";
+  if (!list.length) {
+    const p = el("p", "empty", q ? `ไม่พบ "${$("q").value.trim()}" ลองพิมพ์ชื่อสั้นลง หรือเลือกหมวด "ทั้งหมด"` : "ไม่มีเมนูในหมวดนี้ที่เหมาะกับคุณ");
+    p.style.gridColumn = "1 / -1";
+    $("grid").replaceChildren(p); return;
+  }
+  $("grid").replaceChildren(...list.map((f) => foodCard(f, profile)));
+}
+
+$("q").addEventListener("input", render);
+$("onlyFit").addEventListener("change", render);
+</script>
+</body>
+</html>

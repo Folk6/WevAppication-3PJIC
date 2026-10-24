@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>หน้าหลัก | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head">
+        <div class="home-hello"><img class="home-logo" src="img/favicon.svg" alt="3PJIC" width="48" height="48"><div><small id="today"></small><h1>สวัสดี <span id="who"></span></h1></div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <a class="btn btn-outline" href="weights.html" id="logBtn" hidden>บันทึกน้ำหนัก</a>
+          <button class="help-btn" type="button" id="helpBtn" aria-label="ดูวิธีใช้งาน" title="ดูวิธีใช้งาน" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.7-2.5 2-2.5 4"/><path d="M12 17h.01"/></svg></button>
+        </div>
+      </div>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <!-- ยังไม่ได้ทำแบบประเมิน -->
+      <section class="card" id="needProfile" hidden>
+        <h2 style="font-size:20px">ขั้นที่ 3: ทำแบบประเมินสั้น ๆ</h2>
+        <p style="margin:0;color:var(--muted)">ตอบคำถาม 3 ขั้น ใช้เวลาประมาณ 1 นาที แล้ว 3PJIC จะเริ่มวางแผนการกินที่เหมาะกับคุณ</p>
+        <a class="btn btn-primary" href="assessment.html">เริ่มทำแบบประเมิน</a>
+      </section>
+
+      <!-- ทำแบบประเมินแล้ว -->
+      <div class="cols" id="dashboard" hidden>
+        <div class="col-main">
+          <section class="plan-hero" id="planHero" aria-label="แผนวันนี้"></section>
+
+          <section class="card today-ex" id="exCard" hidden></section>
+
+          <div class="section-head">
+            <h2>เมนูแนะนำวันนี้</h2>
+            <a href="menu.html">ดูเมนูทั้งหมด</a>
+          </div>
+          <div class="meal-grid" id="meals"></div>
+          <p class="empty-note">เลือกจากเมนูที่ไม่มีส่วนผสมที่คุณแพ้ และไม่ขัดกับโรคประจำตัว กด "เปลี่ยน" ถ้าอยากได้เมนูอื่น</p>
+        </div>
+
+        <aside class="col-side">
+          <a class="nudge" href="weights.html" id="nudge" hidden>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 10a3 3 0 016 0"/><path d="M12 10l1.5-2"/></svg>
+            <span><strong>ถึงเวลาชั่งน้ำหนักแล้ว</strong><em style="font-style:normal" id="nudgeText"></em></span>
+          </a>
+          <section class="card" id="goalCard" hidden></section>
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:17px">น้ำหนักล่าสุด</h2><a href="weights.html">ดูทั้งหมด</a></div>
+            <div><span style="font-family:var(--font-display);font-size:30px;font-variant-numeric:tabular-nums" id="lastKg">–</span> กก.</div>
+            <span style="font-size:14px;color:var(--muted)" id="lastKgNote"></span>
+          </section>
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:17px">คำแนะนำสำหรับคุณ</h2><a href="assessment.html">แก้ไข</a></div>
+            <ul class="notes" id="planNotes"></ul>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { loadWeights } from "./js/firebase.js";
+import { guard, el, thaiDate, daysSince } from "./js/shell.js";
+import { analyze, GOALS, ACTIVITY } from "./js/nutrition.js";
+import { pickMeal, MEAL_SLOTS } from "./js/foods.js";
+import { thumb } from "./js/food-ui.js";
+import { activeGoal, goalPlan, progressOf, GOAL_TYPES, weeksLabel } from "./js/goal.js";
+import { startTour } from "./js/tour.js";
+import { DAY_SHORT, KIND, dayIndex, streakWeeks } from "./js/exercise.js";
+import { loadLogs, thisWeek, figure } from "./js/exercise-ui.js";
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { db } from "./js/firebase.js";
+
+const $ = (id) => document.getElementById(id);
+$("today").textContent = new Date().toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long" });
+
+// แบ่งพลังงานต่อวันเป็นมื้อ (สัดส่วนโดยประมาณ)
+const MEALS = [["breakfast", 0.25], ["lunch", 0.35], ["snack", 0.10], ["dinner", 0.30]];
+
+guard({ active: "home" }, async (user, state) => {
+  $("who").textContent = user.displayName || user.email;
+  if (!state.hasProfile) { $("needProfile").hidden = false; return; }
+  $("dashboard").hidden = false;
+  $("logBtn").hidden = false;
+
+  const p = state.data.profile;
+  const r = analyze(p);
+  const goal = r.special ? null : activeGoal(state.data);
+  let ws = [];
+  try { ws = await loadWeights(user.uid, 2); } catch (e) { ws = null; }
+  const latestKg = ws && ws[0] ? ws[0].kg : p.weight;
+  if (goal) r.target = goalPlan(goal, p, latestKg).kcal; // มีเป้าหมาย: ใช้แผนของเป้าหมาย
+
+  // ---- การ์ดสีเขียว: แผนวันนี้ ----
+  const hero = $("planHero");
+  const k = el("div", "k");
+  k.append(el("small", null, "พลังงานแนะนำวันนี้"));
+  if (r.target) {
+    const big = el("strong", null, r.target.toLocaleString());
+    k.append(big, el("span", null, " kcal"));
+  } else {
+    hero.classList.add("special");
+    k.append(el("strong", null, "ไม่กำหนดตัวเลข"), el("span", null, r.special === "minor" ? " · แนะนำตามธงโภชนาการ" : " · ควรให้แพทย์วางแผน"));
+  }
+  const meta = el("div", "meta");
+  [["เป้าหมาย", goal ? GOAL_TYPES[goal.type].verb + " " + Math.abs(goal.targetKg - goal.startKg).toFixed(1) + " กก. ใน " + weeksLabel(goal.weeks) : GOALS[p.goal].label], ["BMI", r.bmi.toFixed(1) + " · " + r.bmiLabel],
+   ["ระดับกิจกรรม", ACTIVITY[p.activity]], ["น้ำที่ควรดื่ม", r.waterL.toFixed(1) + " ลิตร"]].forEach(([a, b]) => {
+    const d = el("div"); d.append(el("small", null, a), el("b", null, b)); meta.append(d);
+  });
+  hero.append(k, meta);
+
+  // ---- เมนูแนะนำรายมื้อ: วันเดียวกันได้ชุดเดิม กด "เปลี่ยน" เพื่อดูตัวถัดไป ----
+  const seed = new Date().toISOString().slice(0, 10) + user.uid;
+  const shift = { breakfast: 0, lunch: 0, snack: 0, dinner: 0 };
+  function renderMeals() {
+    $("meals").replaceChildren(...MEALS.map(([slot, share]) => {
+      const m = el("div", "meal");
+      const food = pickMeal(slot, p, seed, shift[slot]);
+      const kcal = r.target ? "≈ " + Math.round((r.target * share) / 10) * 10 + " kcal" : "ตามหลักจาน 2:1:1";
+      if (!food) {
+        m.append(el("small", null, "มื้อ" + MEAL_SLOTS[slot] + " · " + kcal), el("strong", null, "ยังไม่มีเมนูที่เหมาะกับข้อจำกัดของคุณ"),
+          el("span", "empty-note", "ปรึกษานักกำหนดอาหาร หรือดูเมนูทั้งหมดในหน้าค้นหา"));
+        return m;
+      }
+      const link = el("a", "meal-pick"); link.href = "food.html?id=" + encodeURIComponent(food.id);
+      link.append(thumb(food), el("small", null, "มื้อ" + MEAL_SLOTS[slot] + " · พลังงานแนะนำ " + kcal), el("strong", null, food.name));
+      const act = el("div", "meal-actions");
+      act.append(el("span", "empty-note", food.serving));
+      const btn = el("button", null, "เปลี่ยน"); btn.type = "button"; btn.setAttribute("aria-label", "เปลี่ยนเมนูมื้อ" + MEAL_SLOTS[slot]);
+      btn.onclick = () => { shift[slot]++; renderMeals(); };
+      act.append(btn);
+      m.append(link, act);
+      return m;
+    }));
+  }
+  renderMeals();
+
+  // ---- คำแนะนำ ----
+  $("planNotes").replaceChildren(...r.notes.map((n) => {
+    const li = el("li", n.type); li.append(el("b", null, n.title), document.createTextNode(n.text)); return li;
+  }));
+
+  // ---- การ์ดเป้าหมาย ----
+  const gc = $("goalCard"); gc.hidden = !!r.special;
+  if (goal) {
+    const pr = progressOf(goal, latestKg);
+    const a = el("a", "goal-mini"); a.href = "goal.html";
+    const head = el("div", "section-head"); head.append(el("h2", null, "เป้าหมาย"), el("span", null, pr.reached ? "ถึงเป้าแล้ว" : pr.statusLabel));
+    head.querySelector("h2").style.fontSize = "17px";
+    const bar = el("div", "gh-bar"); const fill = el("i"); fill.style.width = pr.pct + "%"; bar.append(fill);
+    bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuenow", pr.pct); bar.setAttribute("aria-valuemin", 0); bar.setAttribute("aria-valuemax", 100); bar.setAttribute("aria-label", "ความคืบหน้าเป้าหมาย");
+    a.append(head, el("span", null, GOAL_TYPES[goal.type].verb + "ไปแล้ว " + pr.done.toFixed(1) + " จาก " + pr.total.toFixed(1) + " กก. (" + pr.pct + "%)"), bar);
+    gc.replaceChildren(a);
+  } else {
+    gc.append(el("h2", null, "ตั้งเป้าหมาย"), el("span", "empty-note", "อยากลดน้ำหนักหรือเพิ่มกล้ามภายในกี่สัปดาห์ ตั้งเป้าแล้ว 3PJIC จะวางแผนให้"));
+    gc.querySelector("h2").style.fontSize = "17px";
+    const b = el("a", "btn btn-outline", "ตั้งเป้าหมาย"); b.href = "goal.html"; gc.append(b);
+  }
+
+  // ---- การ์ดออกกำลังกายวันนี้ ----
+  try { await exerciseCard(user, state, p); } catch (e) { $("exCard").hidden = true; }
+
+  // ---- ทัวร์แนะนำ: ครั้งแรกหลังทำแบบประเมิน หรือกดปุ่ม ? ----
+  const markSeen = () => { setDoc(doc(db, "users", user.uid), { tourSeen: true }, { merge: true }).catch(() => {}); };
+  $("helpBtn").hidden = false;
+  $("helpBtn").onclick = () => startTour({ onFinish: markSeen });
+  if (!state.data.tourSeen || new URLSearchParams(location.search).has("tour")) {
+    setTimeout(() => startTour({ onFinish: markSeen }), 300); // รอให้หน้าแสดงผลก่อน
+  }
+
+  // ---- น้ำหนักล่าสุด + การ์ดเตือน (ไม่ได้บันทึกเกิน 7 วัน) ----
+  try {
+    if (!ws) throw new Error("load");
+    const last = ws[0];
+    if (last) {
+      $("lastKg").textContent = last.kg.toFixed(1);
+      const d = daysSince(last.at);
+      $("lastKgNote").textContent = "บันทึกเมื่อ " + thaiDate(last.at) + (d > 0 ? " (" + d + " วันก่อน)" : " (วันนี้)");
+      if (ws[1]) {
+        const diff = Math.round((last.kg - ws[1].kg) * 10) / 10;
+        if (diff !== 0) $("lastKgNote").textContent += " · " + (diff < 0 ? "ลดลง " : "เพิ่มขึ้น ") + Math.abs(diff).toFixed(1) + " กก.";
+      }
+      if (d >= 7) { $("nudge").hidden = false; $("nudgeText").textContent = "บันทึกล่าสุดเมื่อ " + d + " วันก่อน กดเพื่อบันทึก"; }
+    } else {
+      $("nudge").hidden = false; $("nudgeText").textContent = "ยังไม่มีประวัติน้ำหนัก กดเพื่อบันทึกครั้งแรก";
+    }
+  } catch (e) { $("lastKgNote").textContent = "โหลดประวัติน้ำหนักไม่สำเร็จ"; }
+});
+
+async function exerciseCard(user, state, p) {
+  const prog = thisWeek(p, state.data.exercise || {});
+  if (prog.blocked) return;
+  const logs = await loadLogs(user.uid);
+  const ti = dayIndex();
+  const d = prog.days[ti];
+  const st = logs[prog.dates[ti]] ? logs[prog.dates[ti]].status : null;
+  const box = $("exCard");
+  const head = el("div", "section-head");
+  head.append(el("h2", null, "ออกกำลังกายวันนี้"));
+  head.firstChild.style.fontSize = "17px";
+  const streak = streakWeeks(prog.days, logs);
+  if (streak >= 1) head.append(el("span", "streak", "🔥 ทำครบ " + streak + " สัปดาห์ติด"));
+  const top = el("div", "top");
+  const pic = el("span", "pic"); pic.append(figure(d.kind === "rest" ? "balance" : d.moves.length ? d.moves[0].fig : "cardio", 40));
+  const txt = el("span"); txt.style.cssText = "display:flex;flex-direction:column;line-height:1.4;min-width:0";
+  const done = st === "done" || st === "short";
+  txt.append(el("strong", null, (done ? "✓ " : "") + d.title), el("span", null, d.kind === "rest" ? d.detail : done ? "ทำแล้ววันนี้ เก่งมาก" : d.detail));
+  txt.lastChild.style.cssText = "font-size:14px;color:var(--muted)";
+  top.append(pic, txt);
+  const dots = el("div", "dots7"); dots.setAttribute("aria-label", "สัปดาห์นี้"); dots.setAttribute("role", "img");
+  let said = [];
+  prog.days.forEach((x, i) => {
+    const s = logs[prog.dates[i]] ? logs[prog.dates[i]].status : null;
+    const ok = s === "done" || s === "short";
+    const sp = el("span", (ok ? "ok" : x.kind === "rest" ? "rest" : "") + (i === ti ? " now" : ""));
+    sp.append(el("i", null, ok ? "✓" : x.kind === "rest" ? "–" : ""), document.createTextNode(DAY_SHORT[i]));
+    dots.append(sp);
+    said.push(DAY_SHORT[i] + " " + (ok ? "ทำแล้ว" : x.kind === "rest" ? "พัก" : KIND[x.kind].label));
+  });
+  dots.setAttribute("aria-label", "สัปดาห์นี้: " + said.join(", "));
+  const row = el("div", "btn-row");
+  if (d.kind !== "rest" && !done) {
+    const go = el("a", "btn btn-primary", "เริ่มเลย"); go.href = "workout.html?d=" + ti; row.append(go);
+  } else { row.style.gridTemplateColumns = "1fr"; }
+  const all = el("a", "btn btn-outline", "ดูทั้งสัปดาห์"); all.href = "exercise.html"; row.append(all);
+  box.replaceChildren(head, top, dots, row);
+  box.hidden = false;
+}
+</script>
+</body>
+</html>
