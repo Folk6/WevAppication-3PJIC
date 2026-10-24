@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>โปรแกรมออกกำลังกาย | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head"><div><small>บันทึกน้ำหนักและการออกกำลังกาย</small><h1>ติดตามผล</h1></div></div>
+      <nav class="tabs2" aria-label="ประเภทการติดตาม"><a href="weights.html">น้ำหนัก</a><span aria-current="page">ออกกำลังกาย</span></nav>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <!-- ตั้งครรภ์ / โรคไต -->
+      <section class="card" id="blocked" hidden>
+        <h2 style="font-size:20px" id="blkTitle"></h2>
+        <p style="margin:0;color:#3c4a43" id="blkText"></p>
+        <strong style="font-size:15px">ระหว่างนี้ทำได้</strong>
+        <ul class="notes" id="blkTips"></ul>
+        <a href="assessment.html">ข้อมูลไม่ถูกต้อง? แก้ในแบบประเมิน</a>
+      </section>
+
+      <div class="cols" id="program" hidden>
+        <div class="col-main">
+          <section class="ex-hero" aria-label="โปรแกรมของฉัน">
+            <small>โปรแกรมของฉัน · สัปดาห์ที่ <span id="weekNo"></span></small>
+            <strong id="progName"></strong>
+            <span class="t" id="progTarget"></span>
+            <div class="row"><span id="weekText"></span><span id="weekPct"></span></div>
+            <div class="gh-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="ความคืบหน้าสัปดาห์นี้" id="weekBar"><i></i></div>
+          </section>
+          <div class="card" style="flex-direction:row;align-items:center;gap:10px;padding:12px 16px;font-size:14px;color:var(--muted)">
+            <span style="flex:1">จัดให้จากแบบประเมิน: <strong style="color:var(--ink)" id="fromProfile"></strong></span>
+            <a href="assessment.html" style="font-weight:600;white-space:nowrap">แก้ไข</a>
+          </div>
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:18px">ตารางสัปดาห์นี้</h2><span id="weekRange"></span></div>
+            <div class="week-grid" id="grid" role="group" aria-label="ตารางออกกำลังกาย 7 วัน"></div>
+            <div class="legend" style="flex-wrap:wrap;gap:4px 14px;font-size:12px"><span>✓ ทำแล้ว</span><span>– ข้าม</span><span>กดวันเพื่อดูรายละเอียด</span></div>
+            <div class="day-panel" id="panel" aria-live="polite"></div>
+          </section>
+        </div>
+        <aside class="col-side">
+          <section class="card">
+            <h2 style="font-size:17px">ทำไมได้โปรแกรมนี้</h2>
+            <ul style="margin:0;padding-left:20px;color:#3c4a43;font-size:15px;display:flex;flex-direction:column;gap:4px" id="why"></ul>
+            <a href="exercise-setup.html" style="font-weight:600">ปรับโปรแกรม (อุปกรณ์ / จำนวนวัน)</a>
+          </section>
+          <section class="card" id="notesCard" hidden>
+            <h2 style="font-size:17px">ข้อควรระวัง</h2>
+            <ul class="notes" id="notes"></ul>
+          </section>
+          <p class="fine" style="margin:0;font-size:13px;color:var(--muted)">หยุดทันทีถ้าเจ็บหน้าอก หน้ามืด หายใจไม่ทัน หรือปวดข้อผิดปกติ · อ้างอิงปริมาณการออกกำลังกาย: <a id="whoLink" target="_blank" rel="noopener"></a></p>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { pageTour, PAGE_STEPS } from "./js/tour.js";
+import { markTourSeen } from "./js/firebase.js";
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { db, thaiError, showAlert } from "./js/firebase.js";
+import { guard, el } from "./js/shell.js";
+import { GOALS, CONDITIONS } from "./js/nutrition.js";
+import { KIND, DAY_SHORT, DAY_FULL, WHO_SOURCE, BLOCKED_TIPS, exerciseBlocked, weekSummary, dayIndex, nextRestDay, isoDate, mondayOf } from "./js/exercise.js";
+import { loadLogs, saveLog, ensureSettings, thisWeek, openSheet } from "./js/exercise-ui.js";
+
+const $ = (id) => document.getElementById(id);
+let user, profile, settings, prog, logs = {}, sel = dayIndex();
+const today = dayIndex();
+
+guard({ active: "track", needProfile: true }, async (u, state) => {
+  pageTour("exercise", PAGE_STEPS.exercise, { data: state.data, save: (key) => markTourSeen(u.uid, key) });
+  user = u; profile = state.data.profile;
+  const blk = exerciseBlocked(profile);
+  if (blk) {
+    $("blocked").hidden = false;
+    $("blkTitle").textContent = blk.title; $("blkText").textContent = blk.text;
+    $("blkTips").replaceChildren(...BLOCKED_TIPS.map((t) => el("li", null, t)));
+    return;
+  }
+  try {
+    settings = await ensureSettings(u.uid, state.data);
+    logs = await loadLogs(u.uid);
+  } catch (e) { showAlert($("formAlert"), thaiError(e)); settings = state.data.exercise || {}; }
+  $("program").hidden = false;
+  const q = new URLSearchParams(location.search).get("d");
+  if (q !== null && /^[0-6]$/.test(q)) sel = Number(q);
+  render();
+});
+
+function statusOf(i) {
+  const l = logs[prog.dates[i]];
+  return l ? l.status : null;
+}
+
+function render() {
+  prog = thisWeek(profile, settings);
+  const conds = (profile.conditions || []).map((c) => CONDITIONS[c]?.label).filter(Boolean);
+  $("fromProfile").textContent = GOALS[profile.goal].label + " · " + profile.age + " ปี · " + (conds.length ? conds.join(" ") : "ไม่มีโรคประจำตัว");
+  const d0 = new Date(prog.dates[0]), d6 = new Date(prog.dates[6]);
+  $("weekRange").textContent = d0.getDate() + "–" + d6.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  $("weekNo").textContent = prog.week;
+  $("progName").textContent = prog.name;
+  $("progTarget").textContent = prog.target;
+  const sum = weekSummary(prog.days, logs);
+  $("weekText").textContent = "ทำแล้ว " + sum.done + " จาก " + sum.planned + " วัน";
+  $("weekPct").textContent = sum.pct + "%";
+  $("weekBar").setAttribute("aria-valuenow", sum.pct);
+  $("weekBar").querySelector("i").style.width = sum.pct + "%";
+  $("why").replaceChildren(...prog.why.map((t) => el("li", null, t)));
+  $("notesCard").hidden = !prog.notes.length;
+  $("notes").replaceChildren(...prog.notes.map((n) => { const li = el("li", "warn"); li.append(el("b", null, n.title), document.createTextNode(n.text)); return li; }));
+  $("whoLink").textContent = WHO_SOURCE.label; $("whoLink").href = WHO_SOURCE.url;
+
+  // ---- ตาราง 7 วัน ----
+  $("grid").replaceChildren(...prog.days.map((d, i) => {
+    const b = el("button", "k-" + d.kind + (i === today ? " today" : ""));
+    b.type = "button";
+    b.setAttribute("aria-pressed", i === sel ? "true" : "false");
+    const st = statusOf(i);
+    const mark = st === "done" || st === "short" ? "✓" : st === "skipped" ? "–" : "";
+    b.setAttribute("aria-label", DAY_FULL[i] + (i === today ? " (วันนี้)" : "") + " " + KIND[d.kind].label + (mark === "✓" ? " ทำแล้ว" : mark ? " ข้าม" : ""));
+    const blk = el("span", "blk");
+    blk.append(el("span", null, KIND[d.kind].short), el("em", null, d.kind === "rest" ? "–" : d.minutes + " น."));
+    b.append(el("span", "d", DAY_SHORT[i]), blk, el("span", "mk" + (st === "skipped" ? " skip" : ""), mark));
+    b.onclick = () => { sel = i; render(); };
+    return b;
+  }));
+  renderPanel();
+}
+
+function renderPanel() {
+  const d = prog.days[sel];
+  const p = $("panel");
+  p.className = "day-panel k-" + d.kind;
+  const st = statusOf(sel);
+  p.replaceChildren(el("small", null, DAY_FULL[sel] + (sel === today ? " (วันนี้)" : "") + " · " + KIND[d.kind].label), el("strong", null, d.title), el("p", null, d.detail));
+  if (d.kind === "rest") {
+    if (d.stretch && st !== "done") { const a = el("a", "btn btn-outline", "ดูท่ายืดคลาย 10 นาที"); a.href = "workout.html?d=" + sel; p.append(a); }
+    else if (d.stretch) p.append(el("p", null, "✓ ยืดคลายแล้ว"));
+    return;
+  }
+  if (st === "done" || st === "short") { p.append(el("p", null, st === "short" ? "✓ ทำแบบสั้นแล้ว" : "✓ ทำแล้ว เก่งมาก")); return; }
+  if (st === "skipped") { p.append(el("p", null, "ข้ามวันนี้แล้ว" + (logs[prog.dates[sel]].reason ? " (" + logs[prog.dates[sel]].reason + ")" : ""))); }
+  const a = el("a", "btn btn-primary", sel > today ? "ดูท่าล่วงหน้า" : "ดูท่าและเริ่ม");
+  a.href = "workout.html?d=" + sel;
+  p.append(a);
+  if (sel >= today && st !== "skipped") {
+    const s = el("button", "linkbtn", "วันนี้ทำไม่ได้"); s.type = "button";
+    s.onclick = () => skipSheet(sel);
+    p.append(s);
+  }
+}
+
+// ---- กล่อง "วันนี้ทำไม่ได้" ----
+const REASONS = [["sick", "ไม่สบาย"], ["busy", "ไม่ว่าง"], ["pain", "เจ็บ/ปวด"], ["tired", "เหนื่อยมาก"]];
+function skipSheet(i) {
+  openSheet((box, close) => {
+    let why = null, act = null;
+    const to = nextRestDay(prog.days, i);
+    const h = el("h2", "", "วันนี้ทำไม่ได้"); h.id = "sheetTitle";
+    const sub = el("small", null, DAY_FULL[i] + " · " + prog.days[i].title);
+    const x = el("button", "sheet-x", "×"); x.type = "button"; x.setAttribute("aria-label", "ปิด"); x.onclick = close;
+    const reasons = el("div", "chips-row"); reasons.setAttribute("role", "group"); reasons.setAttribute("aria-label", "เพราะอะไร");
+    const tip = el("p", "alert alert-warn"); tip.hidden = true;
+    const acts = el("div", null); acts.setAttribute("role", "radiogroup"); acts.setAttribute("aria-label", "จะทำอย่างไร");
+    acts.style.cssText = "display:flex;flex-direction:column;gap:8px";
+    const err = el("p", "field-error");
+    const ok = el("button", "btn btn-primary", "ตกลง"); ok.type = "button";
+
+    function drawActs() {
+      const sickish = why === "sick" || why === "pain";
+      tip.hidden = !sickish;
+      tip.textContent = why === "pain" ? "พักส่วนที่เจ็บ ถ้าปวดเกิน 1 สัปดาห์ บวม หรือขยับไม่ได้ ควรพบแพทย์" : "พักให้หายก่อน เมื่อหายแล้วค่อยกลับมาเริ่มเบา ๆ ไม่ต้องชดเชยวันที่ขาด";
+      const list = [];
+      if (!sickish && to >= 0) list.push(["move", "เลื่อนไป" + DAY_FULL[to], "สลับกับวันพัก เฉพาะสัปดาห์นี้"]);
+      if (!sickish && i === today) list.push(["short", "ทำแบบสั้น 10 นาที", "ทำ 3 ท่า ท่าละ 1 เซต ดีกว่าไม่ได้ทำเลย"]);
+      list.push(["skip", "ข้ามวันนี้", "ไม่เป็นไร ทำวันถัดไปตามแผน"]);
+      if (!list.find((l) => l[0] === act)) act = null;
+      acts.replaceChildren(...list.map(([k, t, s]) => {
+        const b = el("button", "opt"); b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", act === k ? "true" : "false");
+        b.append(document.createTextNode(t), el("span", null, s));
+        b.onclick = () => { act = k; drawActs(); };
+        return b;
+      }));
+    }
+    reasons.append(...REASONS.map(([k, t]) => {
+      const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.onclick = () => { why = k; reasons.querySelectorAll("button").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on); }); drawActs(); };
+      return b;
+    }));
+    drawActs();
+    ok.onclick = async () => {
+      if (!why || !act) { err.textContent = !why ? "เลือกเหตุผลก่อน" : "เลือกว่าจะทำอย่างไร"; return; }
+      ok.disabled = true;
+      try {
+        if (act === "short") { location.href = "workout.html?d=" + i + "&short=1"; return; }
+        if (act === "move") {
+          const key = isoDate(mondayOf());
+          const swaps = Object.assign({}, settings.swaps || {});
+          Object.keys(swaps).forEach((k) => { if (k !== key) delete swaps[k]; }); // เก็บเฉพาะสัปดาห์นี้
+          swaps[key] = (swaps[key] || []).concat([[i, to]]);
+          settings.swaps = swaps;
+          await setDoc(doc(db, "users", user.uid), { exercise: { swaps } }, { merge: true });
+          sel = to;
+        } else {
+          const reason = REASONS.find((r) => r[0] === why)[1];
+          await saveLog(user.uid, prog.dates[i], { day: i, kind: prog.days[i].kind, title: prog.days[i].title, minutes: 0, status: "skipped", reason });
+          logs[prog.dates[i]] = { status: "skipped", reason };
+        }
+        close(); render();
+      } catch (e) { err.textContent = thaiError(e); ok.disabled = false; }
+    };
+    const fs1 = el("div", null); fs1.style.cssText = "display:flex;flex-direction:column;gap:8px";
+    fs1.append(el("strong", null, "เพราะอะไร"), reasons);
+    const head = el("div", "sheet-head"); head.append(sub, h);
+    box.append(x, head, fs1, tip, el("strong", null, "จะทำอย่างไร"), acts, err, ok);
+  });
+}
+</script>
+</body>
+</html>

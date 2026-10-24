@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>รายละเอียดเมนู | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner" id="content">
+      <nav aria-label="ตำแหน่งหน้า" style="font-size:14px;color:var(--muted)"><a href="menu.html">ค้นหาเมนู</a> / <span id="crumb"></span></nav>
+
+      <div class="cols">
+        <div class="col-main" style="flex-basis:380px">
+          <div id="hero"></div>
+          <section class="card" id="altCard" hidden>
+            <h2 style="font-size:17px">ทางเลือกที่ดีกว่า</h2>
+            <p style="margin:0" id="alt"></p>
+          </section>
+          <section class="card" id="similarCard" hidden>
+            <h2 style="font-size:17px">เมนูในหมวดเดียวกันที่เหมาะกับคุณ</h2>
+            <div class="food-grid" id="similar"></div>
+          </section>
+        </div>
+
+        <div class="col-side" style="flex-basis:380px">
+          <div>
+            <small id="cat" style="color:var(--muted)"></small>
+            <h1 id="name" style="font-size:clamp(26px,3.4vw,34px)"></h1>
+            <span id="aliases" style="color:var(--muted);font-size:14px"></span>
+          </div>
+          <div id="fit"></div>
+          <section class="card">
+            <div class="section-head"><h2 style="font-size:17px">สารอาหาร</h2><span id="serving"></span></div>
+            <table class="nut-table" id="nut"></table>
+            <p class="alert" id="nutNote" style="margin:0"></p>
+          </section>
+          <section class="card">
+            <h2 style="font-size:17px">ข้อควรรู้</h2>
+            <dl class="kv" id="facts"></dl>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { guard, el } from "./js/shell.js";
+import { FOODS, CATEGORIES, TAGS, findFood, fitFor, audit, perServing, STATUS_LABEL } from "./js/foods.js";
+import { thumb, foodCard } from "./js/food-ui.js";
+
+const $ = (id) => document.getElementById(id);
+const food = findFood(new URLSearchParams(location.search).get("id"));
+
+guard({ active: "search" }, (user, state) => {
+  if (!food) {
+    $("content").replaceChildren(el("h1", null, "ไม่พบเมนูนี้"), (() => { const a = el("a", "btn btn-outline", "กลับไปค้นหาเมนู"); a.href = "menu.html"; a.style.width = "auto"; a.style.alignSelf = "flex-start"; return a; })());
+    return;
+  }
+  const profile = state.data.profile || null;
+  document.title = food.name + " | 3PJIC";
+  $("crumb").textContent = food.name;
+  $("hero").append(thumb(food, "thumb food-hero"));
+  $("cat").textContent = CATEGORIES[food.cat];
+  $("name").textContent = food.name;
+  if (food.aliases.length) $("aliases").textContent = "ชื่ออื่น: " + food.aliases.join(", ");
+  $("serving").textContent = "หน่วยบริโภค " + food.serving;
+
+  // ---- เหมาะกับผู้ใช้ไหม ----
+  const fit = fitFor(food, profile);
+  const box = el("div", "alert " + (fit.blocked ? "alert-error" : fit.ok ? "alert-success" : "alert-warn"));
+  if (!profile) box.textContent = "ทำแบบประเมินก่อน เพื่อดูว่าเมนูนี้เหมาะกับคุณไหม";
+  else if (fit.ok) box.textContent = "เมนูนี้เหมาะกับคุณ ไม่มีส่วนผสมที่คุณแพ้ และไม่ขัดกับโรคประจำตัวที่ระบุไว้";
+  else {
+    box.append(el("strong", null, fit.blocked ? "ไม่ควรกิน" : "ควรเลี่ยงหรือกินแต่น้อย"));
+    fit.reasons.forEach((r) => box.append(el("div", null, "• " + r)));
+  }
+  $("fit").append(box);
+
+  // ---- ตารางสารอาหาร ----
+  const a = audit(food), ps = perServing(food);
+  const rows = [["พลังงาน", "kcal", "kcal"], ["โปรตีน", "p", "ก."], ["ไขมัน", "f", "ก."], ["คาร์โบไฮเดรต", "c", "ก."], ["น้ำตาล", "sugar", "ก."], ["ใยอาหาร", "fiber", "ก."], ["โซเดียม", "na", "มก."]];
+  const one = !!food.perServingOnly; // ข้อมูลเป็นค่าต่อหน่วยบริโภคอยู่แล้ว (ไม่มีค่าต่อ 100 ก.)
+  const head = el("tr"); head.append(el("th", null, ""));
+  if (!one) head.append(el("th", null, "ต่อ 100 " + (food.unit || "ก.")));
+  head.append(el("th", null, "ต่อ " + food.serving));
+  [...head.children].slice(1).forEach((c) => (c.style.textAlign = "right"));
+  $("nut").append(head);
+  rows.forEach(([label, key, unit]) => {
+    const tr = el("tr");
+    const ok = a.status === "ok";
+    tr.append(el("th", null, label));
+    if (!one) tr.append(el("td", null, ok && food.n[key] != null ? food.n[key] + " " + unit : "—"));
+    tr.append(el("td", null, ps && ps[key] != null ? ps[key] + " " + unit : "—"));
+    $("nut").append(tr);
+  });
+  const note = $("nutNote");
+  if (a.status === "ok") {
+    note.className = "alert alert-success";
+    note.replaceChildren(document.createTextNode((one ? "ข้อมูลต่อ " + food.serving + " จาก " : food.unit === "มล." ? "ข้อมูลต่อ 100 มิลลิลิตร จาก " : "ข้อมูลต่อ 100 กรัม (ส่วนที่กินได้) จาก ")));
+    const srcA = el("a", null, food.src.name); srcA.href = food.src.url; srcA.target = "_blank"; srcA.rel = "noopener"; srcA.style.color = "inherit";
+    note.append(srcA, document.createTextNode((food.src.code ? " รหัส " + food.src.code : "") + (ps ? "" : " · ยังไม่มีน้ำหนักต่อ " + food.serving + " จึงแสดงเฉพาะต่อ 100 " + (food.unit === "มล." ? "มล." : "กรัม"))));
+    if (ps && food.servingSrc) {
+      const sA = el("a", null, food.servingSrc.name); sA.href = food.servingSrc.url; sA.target = "_blank"; sA.rel = "noopener"; sA.style.color = "inherit";
+      note.append(document.createElement("br"), document.createTextNode("น้ำหนักต่อหน่วยบริโภค: "), sA, document.createTextNode(" · ค่าต่อหน่วยเป็นค่าประมาณ ร้านจริงอาจตักมากหรือน้อยกว่านี้"));
+    }
+  } else {
+    note.className = "alert alert-warn";
+    note.textContent = STATUS_LABEL[a.status] + ": 3PJIC จะแสดงตัวเลขเมื่อได้ข้อมูลที่ตรวจจากแหล่งอ้างอิงแล้วเท่านั้น ระหว่างนี้ใช้ป้ายด้านล่างประกอบการตัดสินใจ";
+  }
+
+  // ---- ข้อควรรู้ ----
+  const add = (k, v) => { $("facts").append(el("dt", null, k), el("dd", null, v)); };
+  add("ป้ายโภชนาการ", food.tags.length ? food.tags.map((t) => TAGS[t]).join(", ") : "ไม่มีป้ายเตือน");
+  add("สารก่อภูมิแพ้", food.allergens.length ? food.allergens.join(", ") : "ไม่มีในส่วนผสมทั่วไป");
+  if (food.mayContain && food.mayContain.length) add("อาจมีในเครื่องปรุง / บางร้าน", food.mayContain.join(", ") + " (เช่น น้ำปลา ซีอิ๊ว ซอสหอยนางรม)");
+  add("เหมาะกับมื้อ", food.meals.length ? food.meals.map((m) => ({ breakfast: "เช้า", lunch: "กลางวัน", snack: "ว่าง", dinner: "เย็น" })[m]).join(", ") : "ใช้เพิ่มกับเมนูอื่น");
+
+  if (food.alt) { $("altCard").hidden = false; $("alt").textContent = food.alt; }
+
+  // ---- เมนูอื่นในหมวดเดียวกันที่เหมาะกับผู้ใช้ ----
+  const similar = FOODS.filter((f) => f.cat === food.cat && f.id !== food.id && fitFor(f, profile).ok).slice(0, 4);
+  if (similar.length) { $("similarCard").hidden = false; $("similar").replaceChildren(...similar.map((f) => foodCard(f, profile))); }
+});
+</script>
+</body>
+</html>

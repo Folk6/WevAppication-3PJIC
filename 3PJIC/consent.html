@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>ขอความยินยอม | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="auth" id="page" hidden>
+  <aside class="auth-aside">
+    <span class="brand">3PJIC</span>
+    <h2>ข้อมูลสุขภาพของคุณ คุณเป็นเจ้าของ</h2>
+    <ol class="steps">
+      <li><span class="dot" aria-hidden="true">✓</span>สร้างบัญชี</li>
+      <li class="on"><span class="dot">2</span>ยินยอมการเก็บข้อมูลสุขภาพ</li>
+      <li><span class="dot">3</span>ทำแบบประเมินสั้น ๆ</li>
+    </ol>
+    <span class="foot">เป็นไปตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)</span>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card" style="max-width:520px">
+      <span style="font-size:13px;font-weight:600;color:var(--pandan)">ก่อนเริ่มใช้งาน</span>
+      <h1 style="margin-top:-12px">ขอความยินยอมเก็บข้อมูลสุขภาพ</h1>
+      <div class="info-grid">
+        <div><strong>เราจะเก็บอะไร</strong><span>อายุ เพศ ส่วนสูง น้ำหนัก เป้าหมาย โรคประจำตัว อาหารที่แพ้ และประวัติน้ำหนัก</span></div>
+        <div><strong>ใช้ทำอะไร</strong><span>คำนวณพลังงานและเลือกเมนูที่เหมาะกับคุณเท่านั้น ไม่ขายหรือส่งต่อให้ผู้อื่น</span></div>
+        <div><strong>เก็บที่ไหน</strong><span>ฐานข้อมูล Firebase ที่เฉพาะบัญชีของคุณเข้าถึงได้</span></div>
+        <div><strong>สิทธิ์ของคุณ</strong><span>ดู แก้ไข หรือลบบัญชีและข้อมูลทั้งหมดได้ทุกเมื่อในหน้าตั้งค่า</span></div>
+      </div>
+      <p class="alert alert-warn" style="margin:0">3PJIC ให้คำแนะนำด้านอาหารทั่วไป ไม่ใช้แทนการวินิจฉัยหรือคำแนะนำจากแพทย์</p>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <label class="check" for="agree"><input id="agree" type="checkbox">ฉันยินยอมให้ 3PJIC เก็บและใช้ข้อมูลสุขภาพตามที่ระบุไว้ข้างต้น</label>
+      <button class="btn btn-primary" type="button" id="agreeBtn" disabled>ติ๊กยินยอมก่อนเพื่อไปต่อ</button>
+      <p class="center-note"><a href="index.html">ไม่ยินยอม ใช้เฉพาะส่วนความรู้</a></p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { auth, db, thaiError, setBusy, showAlert, getUserState } from "./js/firebase.js";
+
+const $ = (id) => document.getElementById(id);
+const CONSENT_VERSION = "1.0"; // ถ้าแก้ข้อความยินยอมในอนาคต ให้เพิ่มเลขเวอร์ชัน
+let currentUser = null;
+
+// หน้านี้ต้องเข้าสู่ระบบก่อน และถ้ายินยอมไปแล้วก็ข้ามไปหน้าแอปเลย
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return window.location.replace("login.html");
+  currentUser = user;
+  try {
+    const state = await getUserState(user.uid);
+    if (state.consented) return window.location.replace("app.html");
+  } catch (err) {
+    showAlert($("formAlert"), thaiError(err));
+  }
+  $("loading").hidden = true;
+  $("page").hidden = false;
+});
+
+$("agree").addEventListener("change", () => {
+  const on = $("agree").checked;
+  $("agreeBtn").disabled = !on;
+  $("agreeBtn").textContent = on ? "ยินยอมและเริ่มแบบประเมิน" : "ติ๊กยินยอมก่อนเพื่อไปต่อ";
+});
+
+$("agreeBtn").addEventListener("click", async () => {
+  if (!currentUser || !$("agree").checked) return;
+  setBusy($("agreeBtn"), true, "กำลังบันทึก…");
+  try {
+    // บันทึกการยินยอมพร้อมวันเวลา (เก็บเป็นหลักฐานตาม PDPA)
+    await setDoc(doc(db, "users", currentUser.uid), {
+      displayName: currentUser.displayName || "",
+      email: currentUser.email || "",
+      consent: { agreed: true, version: CONSENT_VERSION, at: serverTimestamp() },
+    }, { merge: true });
+    window.location.replace("app.html");
+  } catch (err) {
+    showAlert($("formAlert"), thaiError(err));
+    setBusy($("agreeBtn"), false);
+  }
+});
+</script>
+</body>
+</html>

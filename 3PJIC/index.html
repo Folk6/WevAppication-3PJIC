@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>3PJIC | อาหารไทยที่เหมาะกับร่างกายคุณ</title>
+<meta name="description" content="3PJIC แนะนำอาหารไทยตามอายุ เป้าหมาย และโรคประจำตัวของคุณ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">3PJIC</a>
+    <div class="actions">
+      <a class="btn btn-outline" href="login.html">เข้าสู่ระบบ</a>
+      <a class="btn btn-primary" href="signup.html">เริ่มใช้งานฟรี</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="alert alert-success" id="deletedMsg" hidden style="margin-top:20px">ลบบัญชีและข้อมูลทั้งหมดเรียบร้อยแล้ว</p>
+  <section class="hero">
+    <div class="hero-text">
+      <span class="eyebrow">ผู้ช่วยแนะนำอาหารสำหรับทุกวัย</span>
+      <h1>อาหารไทยที่เหมาะกับร่างกายคุณ</h1>
+      <p>บอกเราว่าคุณเป็นใคร อยากได้อะไร และต้องระวังเรื่องไหน แล้วรับเมนูแนะนำทุกวัน พร้อมเหตุผลว่าทำไมเหมาะกับคุณ</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="signup.html">เริ่มใช้งานฟรี</a>
+        <a class="btn btn-outline" href="#features">ดูว่า 3PJIC ทำอะไรได้</a>
+      </div>
+    </div>
+    <div class="hero-art">
+      <img class="logo-big" src="img/favicon.svg" alt="โลโก้ 3PJIC" width="240" height="240">
+    </div>
+  </section>
+
+  <section class="features" id="features" aria-label="จุดเด่น">
+    <div><strong>ใช้ได้ทุกวัย</strong><span>ปรับคำแนะนำตามช่วงอายุ ตั้งแต่วัยเรียนถึงผู้สูงอายุ</span></div>
+    <div><strong>คำนึงถึงโรคและอาหารที่แพ้</strong><span>เบาหวาน ความดันสูง ไขมันสูง เกาต์ ตัดเมนูที่ไม่เหมาะออกให้</span></div>
+    <div><strong>ติดตามและปรับแผนให้</strong><span>บันทึกน้ำหนักทุกสัปดาห์ ระบบปรับพลังงานให้อัตโนมัติ</span></div>
+  </section>
+</main>
+
+<script type="module">
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { auth, configReady, routeSignedInUser } from "./js/firebase.js";
+
+if (new URLSearchParams(location.search).has("deleted")) document.getElementById("deletedMsg").hidden = false;
+
+// User flow ข้อ 1: ผู้ใช้ที่ยังล็อกอินค้างอยู่ ข้ามหน้าแรกไปหน้าที่ถูกต้องเลย
+if (configReady) {
+  onAuthStateChanged(auth, (user) => { if (user) routeSignedInUser(user); });
+}
+</script>
+</body>
+</html>

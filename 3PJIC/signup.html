@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>สมัครสมาชิก | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html">3PJIC</a>
+    <h2>อีก 3 ขั้นตอน คุณจะได้เมนูที่เหมาะกับตัวเอง</h2>
+    <ol class="steps">
+      <li class="on"><span class="dot">1</span>สร้างบัญชี</li>
+      <li><span class="dot">2</span>ยินยอมการเก็บข้อมูลสุขภาพ</li>
+      <li><span class="dot">3</span>ทำแบบประเมินสั้น ๆ</li>
+    </ol>
+    <span class="foot">ใช้ได้ฟรี ไม่มีโฆษณา</span>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <a class="brand brand-mobile" href="index.html">3PJIC</a>
+      <h1>สร้างบัญชี 3PJIC</h1>
+      <p class="sub">ใช้เวลาไม่ถึง 1 นาที</p>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <button class="btn btn-outline" type="button" id="googleBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12h8"/></svg>
+        สมัครด้วย Google
+      </button>
+      <div class="divider">หรือใช้อีเมล</div>
+
+      <form id="signupForm" novalidate style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label for="name">ชื่อที่ใช้แสดง</label>
+          <input id="name" type="text" autocomplete="nickname" required>
+          <span class="field-error" id="name-err"></span>
+        </div>
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input id="email" type="email" autocomplete="email" inputmode="email" required>
+          <span class="field-error" id="email-err"></span>
+        </div>
+        <div class="field">
+          <label for="password">รหัสผ่าน</label>
+          <input id="password" type="password" autocomplete="new-password" minlength="6" required>
+          <span class="field-error" id="password-err"></span>
+        </div>
+        <button class="btn btn-primary" type="submit" id="submitBtn">สร้างบัญชี</button>
+      </form>
+
+      <p class="center-note">มีบัญชีแล้ว? <a href="login.html">เข้าสู่ระบบ</a></p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { auth, thaiError, routeSignedInUser, setBusy, showAlert, warnIfNotConfigured } from "./js/firebase.js";
+
+const $ = (id) => document.getElementById(id);
+const alertBox = $("formAlert");
+warnIfNotConfigured(alertBox);
+
+// ถ้าล็อกอินค้างอยู่แล้ว ไม่ต้องสมัครใหม่ พาไปหน้าที่ถูกต้องเลย
+let working = false;
+onAuthStateChanged(auth, (user) => { if (user && !working) routeSignedInUser(user); });
+
+// แสดง/ล้างข้อผิดพลาดใต้ช่อง
+function fieldError(id, msg) {
+  $(id + "-err").textContent = msg;
+  $(id).setAttribute("aria-invalid", msg ? "true" : "false");
+}
+["name", "email", "password"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, "")));
+
+function validate() {
+  const name = $("name").value.trim(), email = $("email").value.trim(), pass = $("password").value;
+  let ok = true;
+  if (!name) { fieldError("name", "กรอกชื่อที่ใช้แสดง"); ok = false; }
+  if (!/^\S+@\S+\.\S+$/.test(email)) { fieldError("email", "กรอกอีเมลให้ถูกต้อง เช่น name@example.com"); ok = false; }
+  if (pass.length < 6) { fieldError("password", "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"); ok = false; }
+  return ok ? { name, email, pass } : null;
+}
+
+// สมัครด้วยอีเมล
+$("signupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  alertBox.textContent = "";
+  const v = validate();
+  if (!v) return;
+  working = true;
+  setBusy($("submitBtn"), true, "กำลังสร้างบัญชี…");
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, v.email, v.pass);
+    await updateProfile(cred.user, { displayName: v.name });
+    window.location.replace("consent.html");
+  } catch (err) {
+    working = false;
+    if (err.code === "auth/email-already-in-use") fieldError("email", thaiError(err));
+    else if (err.code === "auth/weak-password") fieldError("password", thaiError(err));
+    else if (err.code === "auth/invalid-email") fieldError("email", thaiError(err));
+    else showAlert(alertBox, thaiError(err));
+    setBusy($("submitBtn"), false);
+  }
+});
+
+// สมัครด้วย Google (ถ้าเคยมีบัญชีแล้ว จะเข้าสู่ระบบให้แทน)
+$("googleBtn").addEventListener("click", async () => {
+  alertBox.textContent = "";
+  working = true;
+  setBusy($("googleBtn"), true, "กำลังเชื่อมต่อ Google…");
+  try {
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+    await routeSignedInUser(cred.user);
+  } catch (err) {
+    working = false;
+    showAlert(alertBox, thaiError(err));
+    setBusy($("googleBtn"), false);
+  }
+});
+</script>
+</body>
+</html>

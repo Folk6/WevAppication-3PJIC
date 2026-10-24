@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>เข้าสู่ระบบ | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html">3PJIC</a>
+    <img class="logo-big" src="img/favicon.svg" alt="โลโก้ 3PJIC" width="180" height="180" style="margin-top:auto">
+    <h2 style="margin-top:0;text-align:center">เมนูของวันนี้รอคุณอยู่</h2>
+    <span class="foot" style="margin-top:0;margin-bottom:auto;text-align:center">ผู้ช่วยแนะนำอาหารไทยที่เหมาะกับคุณ</span>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <a class="brand brand-mobile" href="index.html">3PJIC</a>
+      <h1>ยินดีต้อนรับกลับ</h1>
+      <p class="sub">เข้าสู่ระบบเพื่อดูเมนูของวันนี้</p>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <button class="btn btn-outline" type="button" id="googleBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12h8"/></svg>
+        เข้าสู่ระบบด้วย Google
+      </button>
+      <div class="divider">หรือใช้อีเมล</div>
+
+      <form id="loginForm" novalidate style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input id="email" type="email" autocomplete="email" inputmode="email" required>
+          <span class="field-error" id="email-err"></span>
+        </div>
+        <div class="field">
+          <div class="row-between">
+            <label for="password">รหัสผ่าน</label>
+            <a href="forgot.html" style="font-size:14px">ลืมรหัสผ่าน?</a>
+          </div>
+          <input id="password" type="password" autocomplete="current-password" required>
+          <span class="field-error" id="password-err"></span>
+        </div>
+        <label class="check" for="remember"><input id="remember" type="checkbox" checked>จดจำการเข้าสู่ระบบบนเครื่องนี้</label>
+        <button class="btn btn-primary" type="submit" id="submitBtn">เข้าสู่ระบบ</button>
+      </form>
+
+      <p class="center-note">ยังไม่มีบัญชี? <a href="signup.html">สมัครสมาชิก</a></p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
+  setPersistence, browserLocalPersistence, browserSessionPersistence }
+  from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { auth, thaiError, routeSignedInUser, setBusy, showAlert, warnIfNotConfigured } from "./js/firebase.js";
+
+const $ = (id) => document.getElementById(id);
+const alertBox = $("formAlert");
+warnIfNotConfigured(alertBox);
+
+// User flow ข้อ 1: ถ้ายังล็อกอินค้างอยู่ ข้ามหน้านี้ไปเลย
+let working = false;
+onAuthStateChanged(auth, (user) => { if (user && !working) routeSignedInUser(user); });
+
+function fieldError(id, msg) {
+  $(id + "-err").textContent = msg;
+  $(id).setAttribute("aria-invalid", msg ? "true" : "false");
+}
+["email", "password"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, "")));
+
+// "จดจำการเข้าสู่ระบบ": ติ๊ก = จำไว้แม้ปิดเบราว์เซอร์, ไม่ติ๊ก = ออกจากระบบเมื่อปิดแท็บ
+// ตั้งค่าไว้ล่วงหน้าทุกครั้งที่ติ๊ก (ไม่รอตอนกดปุ่ม เพื่อไม่ให้เบราว์เซอร์บล็อกหน้าต่าง Google)
+function applyRemember() {
+  return setPersistence(auth, $("remember").checked ? browserLocalPersistence : browserSessionPersistence);
+}
+let persistenceReady = applyRemember();
+$("remember").addEventListener("change", () => { persistenceReady = applyRemember(); });
+
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  alertBox.textContent = "";
+  const email = $("email").value.trim(), pass = $("password").value;
+  let ok = true;
+  if (!email) { fieldError("email", "กรอกอีเมล"); ok = false; }
+  if (!pass) { fieldError("password", "กรอกรหัสผ่าน"); ok = false; }
+  if (!ok) return;
+
+  working = true;
+  setBusy($("submitBtn"), true, "กำลังเข้าสู่ระบบ…");
+  try {
+    await persistenceReady;
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    await routeSignedInUser(cred.user);
+  } catch (err) {
+    working = false;
+    const msg = thaiError(err);
+    // ไม่บอกว่าผิดที่อีเมลหรือรหัสผ่าน เพื่อความปลอดภัย และชี้ไปที่ลืมรหัสผ่าน
+    if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+      alertBox.className = "alert alert-error";
+      alertBox.innerHTML = msg + ' <a href="forgot.html" style="color:inherit">ตั้งรหัสผ่านใหม่</a>';
+    } else {
+      showAlert(alertBox, msg);
+    }
+    setBusy($("submitBtn"), false);
+  }
+});
+
+$("googleBtn").addEventListener("click", async () => {
+  alertBox.textContent = "";
+  working = true;
+  setBusy($("googleBtn"), true, "กำลังเชื่อมต่อ Google…");
+  try {
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+    await routeSignedInUser(cred.user);
+  } catch (err) {
+    working = false;
+    showAlert(alertBox, thaiError(err));
+    setBusy($("googleBtn"), false);
+  }
+});
+</script>
+</body>
+</html>

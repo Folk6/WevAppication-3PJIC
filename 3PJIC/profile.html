@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<title>โปรไฟล์ | 3PJIC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="loading" id="loading">กำลังโหลด…</div>
+
+<div class="shell" id="page" hidden>
+  <nav id="appNav" aria-label="เมนูหลัก"></nav>
+
+  <main class="shell-main">
+    <div class="shell-inner">
+      <div class="page-head">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span class="avatar" id="avatar" aria-hidden="true" style="width:60px;height:60px;font-size:26px"></span>
+          <div><h1 id="name"></h1><small id="email"></small></div>
+        </div>
+      </div>
+      <p class="alert" id="formAlert" role="alert"></p>
+
+      <div class="cols">
+        <section class="card col-main" style="flex-basis:360px">
+          <h2 style="font-size:18px">ข้อมูลสุขภาพ</h2>
+          <dl class="kv" id="health"></dl>
+          <p class="empty-note" id="noProfile" hidden>ยังไม่ได้ทำแบบประเมิน</p>
+          <a class="btn btn-outline" href="assessment.html" id="editBtn">แก้ไขข้อมูลสุขภาพ</a>
+        </section>
+
+        <div class="col-main" style="flex-basis:360px">
+          <div class="list-card">
+            <a href="app.html?tour=1">ดูวิธีใช้งานอีกครั้ง<small>ทัวร์แนะนำ 4 ขั้น</small></a>
+            <button type="button" id="pwBtn">เปลี่ยนรหัสผ่าน<small id="pwNote">ส่งลิงก์ตั้งรหัสใหม่ไปที่อีเมล</small></button>
+            <div class="row-item"><span>ความยินยอมข้อมูลสุขภาพ<small id="consentAt"></small></span></div>
+            <button type="button" id="logoutBtn">ออกจากระบบ</button>
+            <button type="button" class="danger" id="delOpen">ลบบัญชีและข้อมูลทั้งหมด</button>
+          </div>
+
+          <!-- กล่องยืนยันการลบ (User flow: ลบบัญชีและข้อมูล) -->
+          <section class="danger-box" id="delBox" hidden aria-labelledby="delTitle">
+            <strong id="delTitle" style="font-size:16px">ลบแล้วกู้คืนไม่ได้</strong>
+            <span>โปรไฟล์ ข้อมูลสุขภาพ และประวัติน้ำหนักทั้งหมดจะถูกลบ พร้อมบัญชีผู้ใช้ ถ้าต้องการถอนความยินยอมการเก็บข้อมูลสุขภาพ ใช้การลบนี้ได้เช่นกัน</span>
+            <div class="field">
+              <label for="delWord">พิมพ์คำว่า "ลบ" เพื่อยืนยัน</label>
+              <input id="delWord" type="text" autocomplete="off" style="max-width:240px">
+            </div>
+            <div class="field" id="pwField" hidden>
+              <label for="delPw">ใส่รหัสผ่านอีกครั้ง (ยืนยันว่าเป็นเจ้าของบัญชี)</label>
+              <input id="delPw" type="password" autocomplete="current-password" style="max-width:320px">
+            </div>
+            <span class="field-error" id="delErr" style="color:#7a2516"></span>
+            <div class="row">
+              <button class="btn btn-outline" type="button" id="delCancel">ยกเลิก</button>
+              <button class="btn btn-danger" type="button" id="delGo" disabled>ลบถาวร</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { signOut, sendPasswordResetEmail, reauthenticateWithPopup, reauthenticateWithCredential,
+  EmailAuthProvider, GoogleAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { doc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { auth, db, thaiError, setBusy, showAlert } from "./js/firebase.js";
+import { guard, el, thaiDate } from "./js/shell.js";
+import { GOALS, ACTIVITY, CONDITIONS, normAllergies } from "./js/nutrition.js";
+import { activeGoal, GOAL_TYPES, weeksLabel } from "./js/goal.js";
+
+const $ = (id) => document.getElementById(id);
+let user, isGoogle;
+
+guard({ active: "profile" }, async (u, state) => {
+  user = u;
+  isGoogle = u.providerData.some((p) => p.providerId === "google.com");
+  const name = u.displayName || u.email;
+  $("name").textContent = name;
+  $("email").textContent = u.email || "";
+  $("avatar").textContent = name.trim().charAt(0).toUpperCase();
+  const at = state.data.consent?.at?.toDate?.();
+  $("consentAt").textContent = at ? "ยินยอมเมื่อ " + thaiDate(at) + " (ฉบับ " + (state.data.consent.version || "1.0") + ")" : "ยินยอมแล้ว";
+
+  if (isGoogle) { $("pwBtn").hidden = true; }
+  else { $("pwField").hidden = false; }
+
+  const p = state.data.profile;
+  if (!p) { $("noProfile").hidden = false; $("editBtn").textContent = "ทำแบบประเมิน"; return; }
+  const rows = [
+    ["อายุ / เพศ", p.age + " ปี / " + (p.sex === "m" ? "ชาย" : "หญิง")],
+    ["ส่วนสูง / น้ำหนัก", p.height + " ซม. / " + Number(p.weight).toFixed(1) + " กก."],
+    ["ระดับกิจกรรม", ACTIVITY[p.activity]],
+    ["เป้าหมาย", activeGoal(state.data) ? GOAL_TYPES[state.data.goal.type].verb + "เหลือ " + state.data.goal.targetKg.toFixed(1) + " กก. ใน " + weeksLabel(state.data.goal.weeks) : GOALS[p.goal].label],
+    ["โรคประจำตัว", [...(p.conditions || []).map((c) => CONDITIONS[c]?.label || c), ...(p.conditionOther ? [p.conditionOther] : [])].join(", ") || "ไม่มี"],
+    ["แพ้อาหาร", [...normAllergies(p.allergies), ...(p.allergyOther ? [p.allergyOther] : [])].join(", ") || "ไม่มี"],
+  ];
+  if (p.sex === "f" && p.pregnant) rows.push(["ตั้งครรภ์ / ให้นมบุตร", "ใช่"]);
+  if (p.other) rows.push(["อื่น ๆ", p.other]);
+  $("health").replaceChildren(...rows.flatMap(([a, b]) => [el("dt", null, a), el("dd", null, b)]));
+});
+
+// ---- เปลี่ยนรหัสผ่าน: ส่งลิงก์ไปที่อีเมล ----
+$("pwBtn").addEventListener("click", async () => {
+  try {
+    await sendPasswordResetEmail(auth, user.email);
+    showAlert($("formAlert"), "ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ " + user.email + " แล้ว เช็กกล่องจดหมาย (รวมถึงโฟลเดอร์สแปม)", "success");
+  } catch (e) { showAlert($("formAlert"), thaiError(e)); }
+});
+
+// ---- ออกจากระบบ ----
+$("logoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+  window.location.replace("index.html");
+});
+
+// ---- ลบบัญชีและข้อมูลทั้งหมด ----
+function syncDel() {
+  const ok = $("delWord").value.trim() === "ลบ" && (isGoogle || $("delPw").value.length > 0);
+  $("delGo").disabled = !ok;
+  $("delErr").textContent = "";
+}
+$("delWord").addEventListener("input", syncDel);
+$("delPw").addEventListener("input", syncDel);
+$("delOpen").addEventListener("click", () => { $("delBox").hidden = false; $("delWord").focus(); });
+$("delCancel").addEventListener("click", () => { $("delBox").hidden = true; $("delWord").value = ""; $("delPw").value = ""; syncDel(); });
+
+$("delGo").addEventListener("click", async () => {
+  setBusy($("delGo"), true, "กำลังลบ…");
+  try {
+    // 1) ยืนยันตัวตนใหม่ก่อน (Firebase ต้องการการล็อกอินล่าสุดก่อนลบบัญชี)
+    if (isGoogle) await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    else await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, $("delPw").value));
+
+    // 2) ลบข้อมูลใน Firestore: ประวัติน้ำหนัก แล้วเอกสารผู้ใช้
+    const ws = await getDocs(collection(db, "users", user.uid, "weights"));
+    await Promise.all(ws.docs.map((d) => deleteDoc(d.ref)));
+    await deleteDoc(doc(db, "users", user.uid));
+
+    // 3) ลบบัญชี
+    await deleteUser(user);
+    window.location.replace("index.html?deleted=1");
+  } catch (e) {
+    $("delErr").textContent = e.code === "auth/invalid-credential" || e.code === "auth/wrong-password"
+      ? "รหัสผ่านไม่ถูกต้อง ยังไม่มีข้อมูลใดถูกลบ" : thaiError(e);
+    setBusy($("delGo"), false);
+  }
+});
+</script>
+</body>
+</html>

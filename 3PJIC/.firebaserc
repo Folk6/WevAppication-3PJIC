@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "kaidee-99372"
+  },
+  "targets": {
+    "kaidee-99372": {
+      "hosting": {
+        "main": [
+          "3pjic"
+        ]
+      }
+    }
+  }
+}
